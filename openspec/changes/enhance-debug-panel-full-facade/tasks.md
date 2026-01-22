@@ -9,16 +9,16 @@
 - [x] 1.5 Update popup UI to display detailed coin info in expandable rows
 - [x] 1.6 Test detailed coin display on localnet
 
-## Phase 2: Full WalletFacade Integration
+## Phase 2: Full WalletFacade Integration ✅
 
-- [ ] 2.1 Add @midnight-ntwrk/wallet-sdk-facade dependency
-- [ ] 2.2 Add @midnight-ntwrk/wallet-sdk-shielded dependency
-- [ ] 2.3 Add @midnight-ntwrk/wallet-sdk-unshielded-wallet dependency
-- [ ] 2.4 Update wallet.ts to derive ZswapSecretKeys from HD wallet (NightExternal, NightInternal roles)
-- [ ] 2.5 Refactor facade.ts to create full WalletFacade (ShieldedWallet + UnshieldedWallet + DustWallet)
-- [ ] 2.6 Update facade configuration to include all required services
-- [ ] 2.7 Expose FacadeState with shielded, unshielded, and dust state
-- [ ] 2.8 Test WalletFacade initialization and sync on localnet
+- [x] 2.1 Add @midnight-ntwrk/wallet-sdk-facade dependency (already present)
+- [x] 2.2 Add @midnight-ntwrk/wallet-sdk-shielded dependency
+- [x] 2.3 Add @midnight-ntwrk/wallet-sdk-unshielded-wallet dependency
+- [x] 2.4 Update facade to derive ZswapSecretKeys from shielded key
+- [x] 2.5 Refactor facade.ts to create full WalletFacade (ShieldedWallet + UnshieldedWallet + DustWallet)
+- [x] 2.6 Update facade configuration to include all required services
+- [x] 2.7 Expose FacadeState with shielded, unshielded, and dust state
+- [ ] 2.8 Test WalletFacade initialization and sync on localnet (pending manual test)
 
 ## Phase 3: Enhanced Debug State Types
 

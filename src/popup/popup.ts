@@ -432,6 +432,20 @@ interface CoinInfo {
   generation: DustGenerationInfo | null;
 }
 
+interface ShieldedDebugState {
+  balances: Record<string, string>;
+  coinCount: number;
+  address: string | null;
+  syncProgress: SyncProgress | null;
+}
+
+interface UnshieldedDebugState {
+  balance: string;
+  utxoCount: number;
+  isRegistered: boolean;
+  syncProgress: SyncProgress | null;
+}
+
 interface DebugState {
   facadeStarted: boolean;
   syncProgress: SyncProgress | null;
@@ -442,6 +456,8 @@ interface DebugState {
   } | null;
   coinCount: number;
   facadeStartTime: string | null;
+  shielded: ShieldedDebugState | null;
+  unshielded: UnshieldedDebugState | null;
 }
 
 type ServiceStatus = 'healthy' | 'degraded' | 'unhealthy' | 'unknown';

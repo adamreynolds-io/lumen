@@ -33,6 +33,8 @@
     "@midnight-ntwrk/wallet-sdk-facade": "1.0.0-beta.16",
     "@midnight-ntwrk/wallet-sdk-hd": "3.0.0-beta.8",
     "@midnight-ntwrk/wallet-sdk-node-client": "1.0.0-beta.12",
+    "@midnight-ntwrk/wallet-sdk-shielded": "^1.0.0-beta.11",
+    "@midnight-ntwrk/wallet-sdk-unshielded-wallet": "^1.0.0-beta.14",
     "@midnight-ntwrk/wallet-sdk-utilities": "1.0.0-beta.10",
     "bech32": "^2.0.0"
   }

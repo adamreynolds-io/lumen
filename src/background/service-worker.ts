@@ -43,7 +43,7 @@ import {
 
 import {
   LumenFacade,
-  createFacade,
+  createDustOnlyFacade,
   createFacadeConfig,
   type DustBalance,
   type DebugState,
@@ -190,7 +190,7 @@ async function initializeFacade(): Promise<void> {
   );
 
   // Create and start facade with the HD-derived dust key (not raw seed)
-  facade = createFacade(config, currentKeys.dustKey);
+  facade = createDustOnlyFacade(config, currentKeys.dustKey);
 
   try {
     await facade.start();
