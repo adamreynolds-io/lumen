@@ -48,10 +48,27 @@ const elements = {
   btnCancelImportKey: document.getElementById('btn-cancel-import-key')!,
   btnDoImportHex: document.getElementById('btn-do-import-hex')!,
   btnCancelImportHex: document.getElementById('btn-cancel-import-hex')!,
+
+  // Debug panel
+  debugPanel: document.getElementById('debug-panel')!,
+  btnDebugToggle: document.getElementById('btn-debug-toggle')!,
+  btnCopyDebug: document.getElementById('btn-copy-debug')!,
+  syncProgressBar: document.getElementById('sync-progress-bar')!,
+  syncStatus: document.getElementById('sync-status')!,
+  debugBalanceTotal: document.getElementById('debug-balance-total')!,
+  debugBalanceAvailable: document.getElementById('debug-balance-available')!,
+  debugBalancePending: document.getElementById('debug-balance-pending')!,
+  debugCoinCount: document.getElementById('debug-coin-count')!,
+  debugCoinList: document.getElementById('debug-coin-list')!,
+  debugIndexerStatus: document.getElementById('debug-indexer-status')!,
+  debugNodeStatus: document.getElementById('debug-node-status')!,
 };
 
 // State
 let currentSeedPhrase: string[] | null = null;
+let debugPanelVisible = false;
+let debugPollingInterval: ReturnType<typeof setInterval> | null = null;
+const DEBUG_POLL_INTERVAL_MS = 1000;
 
 // Helper: Send message to service worker
 function sendMessage(method: string, params?: unknown): Promise<unknown> {
@@ -397,6 +414,148 @@ chrome.runtime.onMessage.addListener((message) => {
     elements.walletBalance.textContent = message.balance.total;
   }
 });
+
+// ============================================
+// Debug Panel
+// ============================================
+
+interface DebugState {
+  facadeStarted: boolean;
+  syncProgress: {
+    percentage: number;
+    currentBlock: number;
+    targetBlock: number;
+    isComplete: boolean;
+  } | null;
+  balance: {
+    total: bigint;
+    available: bigint;
+    pending: bigint;
+  } | null;
+  coinCount: number;
+  facadeStartTime: string | null;
+}
+
+interface CoinInfo {
+  value: string;
+  status: 'spendable' | 'pending' | 'spent';
+}
+
+interface ConnectionStatus {
+  indexerWs: 'connected' | 'connecting' | 'disconnected' | 'unknown';
+  nodeRpc: 'unknown';
+  lastError: string | null;
+}
+
+// Format large numbers with commas
+function formatNumber(value: string): string {
+  return BigInt(value).toLocaleString();
+}
+
+// Update debug panel with current state
+async function updateDebugPanel(): Promise<void> {
+  try {
+    // Use simple getState which we know works
+    const state = await sendMessage('getState') as { hasWallet: boolean; address?: string; balance?: string; network?: string };
+
+    // Update sync status based on whether we have balance
+    if (state.hasWallet) {
+      if (state.balance && state.balance !== '0' && state.balance !== 'Loading...') {
+        elements.syncProgressBar.style.width = '100%';
+        elements.syncStatus.textContent = 'Synced';
+        elements.syncStatus.className = 'synced';
+      } else {
+        elements.syncProgressBar.style.width = '50%';
+        elements.syncStatus.textContent = 'Syncing...';
+        elements.syncStatus.className = 'syncing';
+      }
+
+      // Update balance breakdown (simple version using existing balance)
+      const balance = state.balance || '0';
+      elements.debugBalanceTotal.textContent = formatNumber(balance);
+      elements.debugBalanceAvailable.textContent = formatNumber(balance);
+      elements.debugBalancePending.textContent = '0';
+    } else {
+      elements.syncProgressBar.style.width = '0%';
+      elements.syncStatus.textContent = 'No wallet';
+      elements.syncStatus.className = '';
+      elements.debugBalanceTotal.textContent = '-';
+      elements.debugBalanceAvailable.textContent = '-';
+      elements.debugBalancePending.textContent = '-';
+    }
+
+    // Simplified coin list - just show count based on balance
+    const hasCoins = state.balance && state.balance !== '0' && state.balance !== 'Loading...';
+    elements.debugCoinCount.textContent = hasCoins ? '?' : '0';
+    elements.debugCoinList.innerHTML = hasCoins
+      ? '<span class="empty">Coin details unavailable</span>'
+      : '<span class="empty">No coins</span>';
+
+    // Connection status - infer from whether we got state
+    updateConnectionIndicator(elements.debugIndexerStatus, state.hasWallet ? 'connected' : 'unknown');
+    updateConnectionIndicator(elements.debugNodeStatus, 'unknown');
+  } catch (error) {
+    console.error('[Lumen] Failed to update debug panel:', error);
+  }
+}
+
+// Update a connection status indicator
+function updateConnectionIndicator(
+  element: HTMLElement,
+  status: 'connected' | 'connecting' | 'disconnected' | 'unknown' | 'error'
+): void {
+  element.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+  element.className = `status-indicator ${status}`;
+}
+
+// Toggle debug panel visibility
+function toggleDebugPanel(): void {
+  debugPanelVisible = !debugPanelVisible;
+
+  if (debugPanelVisible) {
+    elements.debugPanel.classList.remove('hidden');
+    elements.btnDebugToggle.classList.add('active');
+
+    // Start polling
+    updateDebugPanel();
+    debugPollingInterval = setInterval(updateDebugPanel, DEBUG_POLL_INTERVAL_MS);
+  } else {
+    elements.debugPanel.classList.add('hidden');
+    elements.btnDebugToggle.classList.remove('active');
+
+    // Stop polling
+    if (debugPollingInterval) {
+      clearInterval(debugPollingInterval);
+      debugPollingInterval = null;
+    }
+  }
+}
+
+// Copy debug info to clipboard
+async function copyDebugInfo(): Promise<void> {
+  try {
+    const state = await sendMessage('getState') as { hasWallet: boolean; address?: string; balance?: string; network?: string };
+
+    const debugInfo = {
+      timestamp: new Date().toISOString(),
+      hasWallet: state.hasWallet,
+      address: state.address,
+      balance: state.balance,
+      network: state.network,
+    };
+
+    await navigator.clipboard.writeText(JSON.stringify(debugInfo, null, 2));
+    showStatus('Debug info copied to clipboard', 'success');
+  } catch (error) {
+    showStatus(`Failed to copy: ${error}`, 'error');
+  }
+}
+
+// Event: Toggle debug panel
+elements.btnDebugToggle.addEventListener('click', toggleDebugPanel);
+
+// Event: Copy debug info
+elements.btnCopyDebug.addEventListener('click', copyDebugInfo);
 
 // Initialize
 loadWalletState();

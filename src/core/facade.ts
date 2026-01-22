@@ -36,6 +36,46 @@ export interface DustBalance {
   pending: bigint;
 }
 
+export interface SyncProgress {
+  /** Percentage complete (0-100) */
+  percentage: number;
+  /** Current synced block */
+  currentBlock: number;
+  /** Target block to sync to */
+  targetBlock: number;
+  /** Whether sync is complete */
+  isComplete: boolean;
+}
+
+export interface CoinInfo {
+  /** Coin value in smallest unit */
+  value: string;
+  /** Coin status */
+  status: 'spendable' | 'pending' | 'spent';
+}
+
+export interface DebugState {
+  /** Whether facade is started */
+  facadeStarted: boolean;
+  /** Sync progress details */
+  syncProgress: SyncProgress | null;
+  /** Balance breakdown */
+  balance: DustBalance | null;
+  /** Number of coins */
+  coinCount: number;
+  /** Facade start timestamp */
+  facadeStartTime: string | null;
+}
+
+export interface ConnectionStatus {
+  /** Indexer WebSocket status */
+  indexerWs: 'connected' | 'connecting' | 'disconnected' | 'unknown';
+  /** Node RPC status */
+  nodeRpc: 'unknown';
+  /** Last error message if any */
+  lastError: string | null;
+}
+
 // ============================================
 // Wallet Facade
 // ============================================
@@ -49,6 +89,8 @@ export class LumenFacade {
   private config: FacadeConfig;
   /** HD-derived dust key (32 bytes) from HDWallet.selectRole(Dust).deriveKeyAt(0) */
   private dustKey: Uint8Array;
+  /** Timestamp when facade was started */
+  private startTime: Date | null = null;
 
   constructor(config: FacadeConfig, dustKey: Uint8Array) {
     this.config = config;
@@ -93,6 +135,9 @@ export class LumenFacade {
     // Start syncing
     await this.dustWallet.start(dustSecretKey);
 
+    // Record start time
+    this.startTime = new Date();
+
     console.log('[Facade] DustWallet started and syncing');
   }
 
@@ -103,6 +148,7 @@ export class LumenFacade {
     if (this.dustWallet) {
       await this.dustWallet.stop();
       this.dustWallet = null;
+      this.startTime = null;
       console.log('[Facade] DustWallet stopped');
     }
   }
@@ -196,7 +242,14 @@ export class LumenFacade {
     if (!state) {
       return false;
     }
-    return !state.progress.isStrictlyComplete();
+    const progress = state.progress;
+    if (typeof progress.isStrictlyComplete === 'function') {
+      return !progress.isStrictlyComplete();
+    }
+    // Fall back: consider syncing if currentBlock < targetBlock
+    const currentBlock = Number(progress.currentBlockHeight ?? 0);
+    const targetBlock = Number(progress.latestBlockHeight ?? 0);
+    return targetBlock > 0 && currentBlock < targetBlock;
   }
 
   /**
@@ -204,6 +257,121 @@ export class LumenFacade {
    */
   isStarted(): boolean {
     return this.dustWallet !== null;
+  }
+
+  /**
+   * Get debug state for the debug panel.
+   */
+  async getDebugState(): Promise<DebugState> {
+    const facadeStarted = this.dustWallet !== null;
+
+    if (!facadeStarted) {
+      return {
+        facadeStarted: false,
+        syncProgress: null,
+        balance: null,
+        coinCount: 0,
+        facadeStartTime: null,
+      };
+    }
+
+    const state = await this.getCurrentState();
+
+    // Get sync progress
+    let syncProgress: SyncProgress | null = null;
+    if (state) {
+      const progress = state.progress;
+
+      // Calculate percentage from progress
+      // Progress has currentBlockHeight and latestBlockHeight
+      const currentBlock = Number(progress.currentBlockHeight ?? 0);
+      const targetBlock = Number(progress.latestBlockHeight ?? 0);
+
+      // Check if sync is complete - try method first, fall back to property check
+      let isComplete = false;
+      if (typeof progress.isStrictlyComplete === 'function') {
+        isComplete = progress.isStrictlyComplete();
+      } else {
+        // Fall back: consider complete if currentBlock >= targetBlock and targetBlock > 0
+        isComplete = targetBlock > 0 && currentBlock >= targetBlock;
+      }
+
+      const percentage = targetBlock > 0 ? Math.round((currentBlock / targetBlock) * 100) : 0;
+
+      syncProgress = {
+        percentage: isComplete ? 100 : percentage,
+        currentBlock,
+        targetBlock,
+        isComplete,
+      };
+    }
+
+    // Get balance
+    const balance = await this.getBalanceNonBlocking();
+
+    // Get coin count
+    const coinCount = state?.spendableCoins?.length ?? 0;
+
+    return {
+      facadeStarted,
+      syncProgress,
+      balance,
+      coinCount,
+      facadeStartTime: this.startTime?.toISOString() ?? null,
+    };
+  }
+
+  /**
+   * Get list of coins for debug display.
+   */
+  async getCoins(): Promise<CoinInfo[]> {
+    const state = await this.getCurrentState();
+    if (!state) {
+      return [];
+    }
+
+    const coins: CoinInfo[] = [];
+
+    // Add spendable coins
+    for (const coin of state.spendableCoins ?? []) {
+      coins.push({
+        value: coin.initialValue.toString(),
+        status: 'spendable',
+      });
+    }
+
+    // Add pending coins
+    for (const coin of state.pendingCoins ?? []) {
+      coins.push({
+        value: coin.initialValue.toString(),
+        status: 'pending',
+      });
+    }
+
+    return coins;
+  }
+
+  /**
+   * Get connection status for debug display.
+   * Note: Limited info available from DustWallet - mainly inferring from state availability.
+   */
+  async getConnectionStatus(): Promise<ConnectionStatus> {
+    if (!this.dustWallet) {
+      return {
+        indexerWs: 'disconnected',
+        nodeRpc: 'unknown',
+        lastError: null,
+      };
+    }
+
+    // Try to get state - if we can, we're connected
+    const state = await this.getCurrentState();
+
+    return {
+      indexerWs: state ? 'connected' : 'connecting',
+      nodeRpc: 'unknown', // DustWallet doesn't expose node connection status directly
+      lastError: null,
+    };
   }
 }
 

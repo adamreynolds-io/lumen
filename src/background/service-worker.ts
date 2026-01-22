@@ -46,6 +46,9 @@ import {
   createFacade,
   createFacadeConfig,
   type DustBalance,
+  type DebugState,
+  type CoinInfo,
+  type ConnectionStatus,
 } from '../core/facade.js';
 
 console.log('[Lumen] Service worker starting...');
@@ -578,6 +581,45 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
       indexerWsUrl: urls.indexerWsUrl,
       proverUrl: urls.proverUrl,
     };
+  },
+
+  // === Debug Methods ===
+
+  // Get debug state for debug panel
+  getDebugState: async (): Promise<DebugState> => {
+    if (!facade) {
+      return {
+        facadeStarted: false,
+        syncProgress: null,
+        balance: null,
+        coinCount: 0,
+        facadeStartTime: null,
+      };
+    }
+
+    return facade.getDebugState();
+  },
+
+  // Get list of coins for debug display
+  getCoins: async (): Promise<CoinInfo[]> => {
+    if (!facade) {
+      return [];
+    }
+
+    return facade.getCoins();
+  },
+
+  // Get connection status for debug display
+  getConnectionStatus: async (): Promise<ConnectionStatus> => {
+    if (!facade) {
+      return {
+        indexerWs: 'disconnected',
+        nodeRpc: 'unknown',
+        lastError: null,
+      };
+    }
+
+    return facade.getConnectionStatus();
   },
 };
 

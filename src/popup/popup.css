@@ -286,3 +286,219 @@ button.icon-btn:hover {
   color: #666;
   margin-top: 8px;
 }
+
+/* Debug Toggle Button */
+.debug-toggle {
+  margin-left: auto;
+  padding: 4px 8px;
+  font-size: 14px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0.5;
+  transition: opacity 0.2s, background 0.2s;
+}
+
+.debug-toggle:hover {
+  opacity: 1;
+  background: #2a2a3e;
+}
+
+.debug-toggle.active {
+  opacity: 1;
+  background: #2a2a3e;
+  border-color: #667eea;
+}
+
+/* Debug Panel */
+.debug-panel {
+  margin-top: 16px;
+  padding: 12px;
+  background: #0d0d1a;
+  border: 1px solid #2a2a3e;
+  border-radius: 4px;
+  font-family: 'SF Mono', Monaco, monospace;
+  font-size: 11px;
+}
+
+.debug-header {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #667eea;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #2a2a3e;
+}
+
+.debug-section {
+  margin-bottom: 12px;
+}
+
+.debug-section:last-of-type {
+  margin-bottom: 0;
+}
+
+.debug-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  color: #555;
+  margin-bottom: 6px;
+}
+
+.debug-value {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+  color: #aaa;
+}
+
+.debug-value .label {
+  color: #666;
+}
+
+/* Sync Progress Bar */
+.debug-sync {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sync-bar {
+  height: 4px;
+  background: #2a2a3e;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.sync-progress {
+  height: 100%;
+  background: linear-gradient(90deg, #667eea, #764ba2);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+#sync-status {
+  font-size: 10px;
+  color: #888;
+}
+
+#sync-status.synced {
+  color: #4caf50;
+}
+
+#sync-status.syncing {
+  color: #f0ad4e;
+}
+
+/* Coin List */
+.debug-coin-list {
+  max-height: 100px;
+  overflow-y: auto;
+  background: #1a1a2e;
+  border-radius: 4px;
+  padding: 4px;
+}
+
+.debug-coin-list .empty {
+  display: block;
+  padding: 8px;
+  text-align: center;
+  color: #555;
+}
+
+.coin-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 8px;
+  border-radius: 2px;
+}
+
+.coin-item:nth-child(odd) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.coin-value {
+  color: #aaa;
+}
+
+.coin-status {
+  font-size: 9px;
+  text-transform: uppercase;
+  padding: 1px 4px;
+  border-radius: 2px;
+}
+
+.coin-item.spendable .coin-status {
+  color: #4caf50;
+  background: rgba(76, 175, 80, 0.1);
+}
+
+.coin-item.pending .coin-status {
+  color: #f0ad4e;
+  background: rgba(240, 173, 78, 0.1);
+}
+
+.coin-item.spent .coin-status {
+  color: #666;
+  background: rgba(102, 102, 102, 0.1);
+}
+
+/* Connection Status Indicators */
+.status-indicator {
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.status-indicator.connected {
+  color: #4caf50;
+}
+
+.status-indicator.connected::before {
+  content: '● ';
+}
+
+.status-indicator.connecting {
+  color: #f0ad4e;
+}
+
+.status-indicator.connecting::before {
+  content: '◐ ';
+}
+
+.status-indicator.disconnected {
+  color: #f44336;
+}
+
+.status-indicator.disconnected::before {
+  content: '● ';
+}
+
+.status-indicator.unknown {
+  color: #666;
+}
+
+.status-indicator.unknown::before {
+  content: '○ ';
+}
+
+.status-indicator.error {
+  color: #f44336;
+}
+
+.status-indicator.error::before {
+  content: '✕ ';
+}
+
+/* Debug Actions */
+.debug-actions {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #2a2a3e;
+}
+
+.debug-actions button {
+  width: 100%;
+  padding: 8px;
+  font-size: 12px;
+}

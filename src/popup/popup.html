@@ -11,6 +11,7 @@
     <header>
       <h1>Lumen</h1>
       <span class="version">v0.1.0</span>
+      <button id="btn-debug-toggle" class="debug-toggle" title="Toggle Debug Panel">🔧</button>
     </header>
 
     <!-- No Wallet State -->
@@ -82,6 +83,68 @@
       <div class="actions">
         <button id="btn-test-connection" class="secondary">Test Connection</button>
         <button id="btn-clear-wallet" class="danger">Clear Wallet</button>
+      </div>
+    </div>
+
+    <!-- Debug Panel (collapsible) -->
+    <div id="debug-panel" class="debug-panel hidden">
+      <div class="debug-header">
+        <span>Debug Info</span>
+      </div>
+      <div class="debug-content">
+        <!-- Sync Progress -->
+        <div class="debug-section">
+          <div class="debug-label">Sync Progress</div>
+          <div class="debug-sync">
+            <div class="sync-bar">
+              <div id="sync-progress-bar" class="sync-progress" style="width: 0%"></div>
+            </div>
+            <span id="sync-status">Not started</span>
+          </div>
+        </div>
+
+        <!-- Balance Breakdown -->
+        <div class="debug-section">
+          <div class="debug-label">Balance Breakdown</div>
+          <div class="debug-value">
+            <span class="label">Total:</span>
+            <span id="debug-balance-total">-</span>
+          </div>
+          <div class="debug-value">
+            <span class="label">Available:</span>
+            <span id="debug-balance-available">-</span>
+          </div>
+          <div class="debug-value">
+            <span class="label">Pending:</span>
+            <span id="debug-balance-pending">-</span>
+          </div>
+        </div>
+
+        <!-- Coins -->
+        <div class="debug-section">
+          <div class="debug-label">Coins (<span id="debug-coin-count">0</span>)</div>
+          <div id="debug-coin-list" class="debug-coin-list">
+            <span class="empty">No coins</span>
+          </div>
+        </div>
+
+        <!-- Connection Status -->
+        <div class="debug-section">
+          <div class="debug-label">Connection</div>
+          <div class="debug-value">
+            <span class="label">Indexer WS:</span>
+            <span id="debug-indexer-status" class="status-indicator">-</span>
+          </div>
+          <div class="debug-value">
+            <span class="label">Node RPC:</span>
+            <span id="debug-node-status" class="status-indicator">-</span>
+          </div>
+        </div>
+
+        <!-- Copy Debug Info -->
+        <div class="debug-actions">
+          <button id="btn-copy-debug" class="secondary">Copy Debug Info</button>
+        </div>
       </div>
     </div>
 
