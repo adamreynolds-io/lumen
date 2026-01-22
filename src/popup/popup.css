@@ -50,8 +50,7 @@ header h1 {
   border: 1px solid transparent;
   border-radius: 4px;
   cursor: pointer;
-  opacity: 0.6;
-  transition: opacity 0.2s, background 0.2s;
+  transition: background 0.2s;
   color: #fff;
   display: flex;
   align-items: center;
@@ -59,7 +58,6 @@ header h1 {
 }
 
 .header-btn:hover {
-  opacity: 1;
   background: #2a2a3e;
 }
 
@@ -336,8 +334,7 @@ button.icon-btn:hover {
   border: 1px solid transparent;
   border-radius: 4px;
   cursor: pointer;
-  opacity: 0.6;
-  transition: opacity 0.2s, background 0.2s;
+  transition: background 0.2s;
   color: #fff;
   display: flex;
   align-items: center;
@@ -345,7 +342,6 @@ button.icon-btn:hover {
 }
 
 .debug-toggle:hover {
-  opacity: 1;
   background: #2a2a3e;
 }
 
