@@ -10,34 +10,56 @@ export type NetworkId = 'localnet' | 'devnet' | 'qanet' | 'preview' | 'preprod' 
 export interface NetworkConfig {
   id: NetworkId;
   name: string;
-  rpcUrl: string;
+  /** Substrate node RPC URL */
+  nodeUrl: string;
+  /** Indexer HTTP URL for queries */
+  indexerUrl: string;
+  /** Indexer WebSocket URL for subscriptions */
+  indexerWsUrl: string;
+  /** Prover server URL for ZK proof generation */
+  proverUrl: string;
 }
 
 export const NETWORKS: Record<Exclude<NetworkId, 'custom'>, NetworkConfig> = {
   localnet: {
     id: 'localnet',
     name: 'Localnet',
-    rpcUrl: 'http://localhost:9944',
+    nodeUrl: 'http://localhost:9944',
+    indexerUrl: 'http://localhost:8088',
+    indexerWsUrl: 'ws://localhost:8088',
+    proverUrl: 'http://localhost:6300',
   },
   devnet: {
     id: 'devnet',
     name: 'DevNet',
-    rpcUrl: 'https://rpc.devnet.midnight.network',
+    nodeUrl: 'https://rpc.devnet.midnight.network',
+    indexerUrl: 'https://indexer.devnet.midnight.network',
+    indexerWsUrl: 'wss://indexer.devnet.midnight.network',
+    proverUrl: 'https://prover.devnet.midnight.network',
   },
   qanet: {
     id: 'qanet',
     name: 'QANET',
-    rpcUrl: 'https://rpc.qanet.midnight.network',
+    nodeUrl: 'https://rpc.qanet.midnight.network',
+    indexerUrl: 'https://indexer.qanet.midnight.network',
+    indexerWsUrl: 'wss://indexer.qanet.midnight.network',
+    proverUrl: 'https://prover.qanet.midnight.network',
   },
   preview: {
     id: 'preview',
     name: 'Preview',
-    rpcUrl: 'https://rpc.preview.midnight.network',
+    nodeUrl: 'https://rpc.preview.midnight.network',
+    indexerUrl: 'https://indexer.preview.midnight.network',
+    indexerWsUrl: 'wss://indexer.preview.midnight.network',
+    proverUrl: 'https://prover.preview.midnight.network',
   },
   preprod: {
     id: 'preprod',
     name: 'PreProd',
-    rpcUrl: 'https://rpc.preprod.midnight.network',
+    nodeUrl: 'https://rpc.preprod.midnight.network',
+    indexerUrl: 'https://indexer.preprod.midnight.network',
+    indexerWsUrl: 'wss://indexer.preprod.midnight.network',
+    proverUrl: 'https://prover.preprod.midnight.network',
   },
 };
 
@@ -47,7 +69,13 @@ export interface WalletState {
   address?: string;
   balance?: string;
   network: NetworkId;
-  customRpcUrl?: string;
+  /** Custom network URLs (only used when network === 'custom') */
+  customUrls?: {
+    nodeUrl?: string;
+    indexerUrl?: string;
+    indexerWsUrl?: string;
+    proverUrl?: string;
+  };
 }
 
 // Message types for extension communication

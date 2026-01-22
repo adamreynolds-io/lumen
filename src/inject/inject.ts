@@ -130,6 +130,7 @@ function sendRequest(method: string, params?: unknown): Promise<unknown> {
 interface Configuration {
   indexerUri: string;
   indexerWsUri: string;
+  proverServerUri?: string;
   substrateNodeUri: string;
   networkId: string;
 }
@@ -305,11 +306,18 @@ function createConnectedAPI(networkId: string): ConnectedAPI {
 
     // Configuration
     async getConfiguration(): Promise<Configuration> {
-      const network = (await sendRequest('getNetwork')) as { rpcUrl: string; networkId: string };
+      const network = (await sendRequest('getNetwork')) as {
+        networkId: string;
+        nodeUrl: string;
+        indexerUrl: string;
+        indexerWsUrl: string;
+        proverUrl: string;
+      };
       return {
-        indexerUri: network.rpcUrl.replace(/:\d+$/, ':8088'),
-        indexerWsUri: network.rpcUrl.replace('http', 'ws').replace(/:\d+$/, ':8088'),
-        substrateNodeUri: network.rpcUrl,
+        indexerUri: network.indexerUrl,
+        indexerWsUri: network.indexerWsUrl,
+        proverServerUri: network.proverUrl,
+        substrateNodeUri: network.nodeUrl,
         networkId: network.networkId,
       };
     },

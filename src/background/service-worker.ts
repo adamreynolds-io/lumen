@@ -33,9 +33,11 @@ import {
   saveNetworkConfig,
   loadNetworkConfig,
   getRpcUrl,
+  getNetworkUrls,
   getNetworkPresets,
   isValidRpcUrl,
   type NetworkStatus,
+  type NetworkUrls,
 } from '../core/network.js';
 
 console.log('[Lumen] Service worker starting...');
@@ -173,26 +175,29 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
   },
 
   // Set network
-  setNetwork: async (params: { network: NetworkId; customRpcUrl?: string }) => {
-    // Validate custom RPC URL if provided
+  setNetwork: async (params: {
+    network: NetworkId;
+    customUrls?: { nodeUrl?: string; indexerUrl?: string; indexerWsUrl?: string; proverUrl?: string };
+  }) => {
+    // Validate custom URLs if provided
     if (params.network === 'custom') {
-      if (!params.customRpcUrl) {
-        throw new LumenError('Custom network requires an RPC URL', 'INVALID_INPUT');
+      if (!params.customUrls?.nodeUrl) {
+        throw new LumenError('Custom network requires a node URL', 'INVALID_INPUT');
       }
-      if (!isValidRpcUrl(params.customRpcUrl)) {
-        throw new LumenError('Invalid RPC URL format', 'INVALID_INPUT');
+      if (!isValidRpcUrl(params.customUrls.nodeUrl)) {
+        throw new LumenError('Invalid node URL format', 'INVALID_INPUT');
       }
     }
 
     const previousNetwork = walletState.network;
     walletState.network = params.network;
 
-    if (params.network === 'custom' && params.customRpcUrl) {
-      walletState.customRpcUrl = params.customRpcUrl;
+    if (params.network === 'custom' && params.customUrls) {
+      walletState.customUrls = params.customUrls;
     }
 
     // Persist to storage
-    await saveNetworkConfig(params.network, params.customRpcUrl);
+    await saveNetworkConfig(params.network, params.customUrls?.nodeUrl);
 
     // Re-derive address if wallet exists and network changed
     if (currentKeys && currentWalletInfo && previousNetwork !== params.network) {
@@ -205,7 +210,7 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
 
   // Test connection
   testConnection: async (): Promise<NetworkStatus> => {
-    const rpcUrl = getRpcUrl(walletState.network, walletState.customRpcUrl);
+    const rpcUrl = getRpcUrl(walletState.network, walletState.customUrls?.nodeUrl);
 
     console.log('[Lumen] Testing connection to:', rpcUrl);
 
@@ -225,11 +230,16 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
     return getNetworkPresets();
   },
 
+  // Get all network URLs for current network
+  getNetworkUrls: (): NetworkUrls => {
+    return getNetworkUrls(walletState.network, walletState.customUrls);
+  },
+
   // Refresh balance from network
   refreshBalance: async () => {
     requireWallet();
 
-    const rpcUrl = getRpcUrl(walletState.network, walletState.customRpcUrl);
+    const rpcUrl = getRpcUrl(walletState.network, walletState.customUrls?.nodeUrl);
     const balance = await queryBalance(rpcUrl, walletState.address!);
 
     walletState.balance = balance.total;
@@ -307,23 +317,26 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
   submitTransaction: async (params: { tx: string }) => {
     requireWallet();
 
-    const rpcUrl = getRpcUrl(walletState.network, walletState.customRpcUrl);
+    const urls = getNetworkUrls(walletState.network, walletState.customUrls);
 
     // TODO: Implement actual transaction submission using @polkadot/api
     // For now, log and return success (developer wallet is for testing)
-    console.log('[Lumen] Transaction submitted to:', rpcUrl);
+    console.log('[Lumen] Transaction submitted to:', urls.nodeUrl);
     console.log('[Lumen] Transaction data:', params.tx.slice(0, 50) + '...');
 
     return { success: true };
   },
 
-  // Get network info
+  // Get network info (full URLs for dapp-connector-api Configuration)
   getNetwork: () => {
-    const rpcUrl = getRpcUrl(walletState.network, walletState.customRpcUrl);
+    const urls = getNetworkUrls(walletState.network, walletState.customUrls);
 
     return {
-      rpcUrl,
       networkId: walletState.network,
+      nodeUrl: urls.nodeUrl,
+      indexerUrl: urls.indexerUrl,
+      indexerWsUrl: urls.indexerWsUrl,
+      proverUrl: urls.proverUrl,
     };
   },
 };

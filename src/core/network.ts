@@ -93,17 +93,45 @@ export async function disconnectApi(): Promise<void> {
 // Network Operations
 // ============================================
 
+export interface NetworkUrls {
+  nodeUrl: string;
+  indexerUrl: string;
+  indexerWsUrl: string;
+  proverUrl: string;
+}
+
 /**
- * Get the RPC URL for a network.
+ * Get all network URLs for a network.
  */
-export function getRpcUrl(networkId: NetworkId, customRpcUrl?: string): string {
+export function getNetworkUrls(
+  networkId: NetworkId,
+  customUrls?: Partial<NetworkUrls>
+): NetworkUrls {
   if (networkId === 'custom') {
-    if (!customRpcUrl) {
-      throw new LumenError('Custom network requires an RPC URL', 'INVALID_INPUT');
+    if (!customUrls?.nodeUrl) {
+      throw new LumenError('Custom network requires a node URL', 'INVALID_INPUT');
     }
-    return customRpcUrl;
+    return {
+      nodeUrl: customUrls.nodeUrl,
+      indexerUrl: customUrls.indexerUrl || customUrls.nodeUrl.replace(':9944', ':8088'),
+      indexerWsUrl: customUrls.indexerWsUrl || customUrls.nodeUrl.replace('http', 'ws').replace(':9944', ':8088'),
+      proverUrl: customUrls.proverUrl || customUrls.nodeUrl.replace(':9944', ':6300'),
+    };
   }
-  return NETWORKS[networkId].rpcUrl;
+  return NETWORKS[networkId];
+}
+
+/**
+ * Get the node RPC URL for a network.
+ */
+export function getRpcUrl(networkId: NetworkId, customNodeUrl?: string): string {
+  if (networkId === 'custom') {
+    if (!customNodeUrl) {
+      throw new LumenError('Custom network requires a node URL', 'INVALID_INPUT');
+    }
+    return customNodeUrl;
+  }
+  return NETWORKS[networkId].nodeUrl;
 }
 
 /**

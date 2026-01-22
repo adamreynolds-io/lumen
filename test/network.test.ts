@@ -53,7 +53,7 @@ console.log('\n=== Network Layer Unit Tests ===\n');
 // getRpcUrl Tests
 test('getRpcUrl returns correct URL for devnet', () => {
   const url = getRpcUrl('devnet');
-  assertEqual(url, NETWORKS.devnet.rpcUrl, 'DevNet RPC URL');
+  assertEqual(url, NETWORKS.devnet.nodeUrl, 'DevNet RPC URL');
 });
 
 test('getRpcUrl returns correct URL for localnet', () => {
@@ -63,17 +63,17 @@ test('getRpcUrl returns correct URL for localnet', () => {
 
 test('getRpcUrl returns correct URL for qanet', () => {
   const url = getRpcUrl('qanet');
-  assertEqual(url, NETWORKS.qanet.rpcUrl, 'QANET RPC URL');
+  assertEqual(url, NETWORKS.qanet.nodeUrl, 'QANET RPC URL');
 });
 
 test('getRpcUrl returns correct URL for preview', () => {
   const url = getRpcUrl('preview');
-  assertEqual(url, NETWORKS.preview.rpcUrl, 'Preview RPC URL');
+  assertEqual(url, NETWORKS.preview.nodeUrl, 'Preview RPC URL');
 });
 
 test('getRpcUrl returns correct URL for preprod', () => {
   const url = getRpcUrl('preprod');
-  assertEqual(url, NETWORKS.preprod.rpcUrl, 'PreProd RPC URL');
+  assertEqual(url, NETWORKS.preprod.nodeUrl, 'PreProd RPC URL');
 });
 
 test('getRpcUrl returns custom URL when provided', () => {
@@ -113,7 +113,9 @@ test('getNetworkPreset returns correct config for devnet', () => {
   const preset = getNetworkPreset('devnet');
   assertEqual(preset.id, 'devnet', 'ID');
   assertEqual(preset.name, 'DevNet', 'Name');
-  assert(preset.rpcUrl.includes('devnet'), 'RPC URL should contain devnet');
+  assert(preset.nodeUrl.includes('devnet'), 'Node URL should contain devnet');
+  assert(preset.indexerUrl.includes('devnet'), 'Indexer URL should contain devnet');
+  assert(preset.proverUrl.includes('devnet'), 'Prover URL should contain devnet');
 });
 
 // isValidRpcUrl Tests
