@@ -152,6 +152,10 @@ function showSection(
   elements.importKey.classList.add('hidden');
   elements.importHex.classList.add('hidden');
 
+  // Show/hide export button based on wallet state
+  const hasWallet = section === 'wallet';
+  elements.btnCopyDebug.classList.toggle('hidden', !hasWallet);
+
   switch (section) {
     case 'no-wallet':
       elements.noWallet.classList.remove('hidden');

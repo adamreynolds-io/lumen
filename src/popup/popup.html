@@ -11,9 +11,11 @@
     <header>
       <h1>Lumen</h1>
       <span class="version">v0.1.0</span>
+      <button id="btn-copy-debug" class="header-btn hidden" title="Export Full State">📤</button>
       <button id="btn-debug-toggle" class="debug-toggle" title="Toggle Debug Panel">🔧</button>
     </header>
 
+    <div class="scroll-content">
     <!-- No Wallet State -->
     <div id="no-wallet" class="section">
       <p class="message">No wallet loaded</p>
@@ -224,10 +226,6 @@
           </div>
         </div>
 
-        <!-- Copy Debug Info -->
-        <div class="debug-actions">
-          <button id="btn-copy-debug" class="secondary">Export Full State</button>
-        </div>
       </div>
     </div>
 
@@ -274,6 +272,7 @@
 
     <!-- Status Messages -->
     <div id="status" class="status hidden"></div>
+    </div><!-- end scroll-content -->
   </div>
 
   <script src="popup.js" type="module"></script>
