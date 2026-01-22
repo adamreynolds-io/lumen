@@ -40,24 +40,6 @@ Run a local Midnight network for development and testing.
 - Docker and Docker Compose installed
 - Ports 9944, 8088, and 6300 available
 
-### Configuration
-
-1. Copy environment template:
-   ```bash
-   cp .env.example .env
-   ```
-
-2. Generate the indexer secret:
-   ```bash
-   # On macOS/Linux:
-   openssl rand -hex 32
-   ```
-
-3. Add the generated secret to `.env`:
-   ```
-   APP_INFRA_SECRET=your_generated_secret_here
-   ```
-
 ### Start Localnet
 
 ```bash
@@ -79,6 +61,15 @@ npm run localnet:up      # Start all services
 npm run localnet:down    # Stop all services
 npm run localnet:logs    # View service logs
 npm run localnet:reset   # Reset (clear data and restart)
+```
+
+### Custom Configuration (Optional)
+
+To use a custom indexer secret, create a `.env` file:
+
+```bash
+cp .env.example .env
+# Edit .env and set APP_INFRA_SECRET=$(openssl rand -hex 32)
 ```
 
 ### Using with Lumen

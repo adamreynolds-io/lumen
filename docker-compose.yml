@@ -38,7 +38,7 @@ services:
       - RUST_LOG=info
       - NETWORK_ID=undeployed
       - NODE_URL=ws://node:9944
-      - APP_INFRA_SECRET=${APP_INFRA_SECRET}
+      - APP_INFRA_SECRET=${APP_INFRA_SECRET:-0000000000000000000000000000000000000000000000000000000000000001}
     depends_on:
       node:
         condition: service_healthy
