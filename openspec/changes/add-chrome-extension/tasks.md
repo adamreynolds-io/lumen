@@ -39,15 +39,21 @@
 
 **Verified**: Test page at `test/dapp-test.html` confirms full message flow working.
 
-## Phase 3: Wallet Core
+## Phase 3: Wallet Core ✅
 
-- [ ] Implement wallet generation (BIP39 seed phrase)
-- [ ] Implement wallet import from seed phrase
-- [ ] Implement wallet import from private key (hex)
-- [ ] Implement address derivation
-- [ ] Implement transaction signing
-- [ ] Implement message signing
-- [ ] Unit tests for wallet operations
+- [x] Implement wallet generation (BIP39 seed phrase)
+- [x] Implement wallet import from seed phrase
+- [x] Implement wallet import from private key (hex)
+- [x] Implement address derivation
+- [x] Implement transaction signing
+- [x] Implement message signing
+- [x] Unit tests for wallet operations
+
+**Implementation Notes**:
+- Created `src/core/wallet.ts` using @midnight-ntwrk/wallet-sdk-hd for HD wallet operations
+- Uses @scure/bip39 for mnemonic-to-seed derivation (SDK's mnemonicToSeed had different signature)
+- Address formatting uses hex format with network prefix (mn_dev_, mn_loc_, etc.) - browser-compatible bech32m encoding deferred due to SDK WASM dependencies
+- All 21 unit tests passing in `test/wallet.test.ts`
 
 ## Phase 4: Network Layer
 

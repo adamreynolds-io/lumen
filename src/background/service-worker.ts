@@ -9,13 +9,14 @@
  */
 
 import {
-  generateMnemonicWords,
-  generateRandomSeed,
-  validateMnemonic,
-  joinMnemonicWords,
-  HDWallet,
-  Roles,
-} from '@midnight-ntwrk/wallet-sdk-hd';
+  createWallet,
+  importFromMnemonic,
+  importFromPrivateKey,
+  signMessage,
+  signTransaction,
+  type WalletKeys,
+  type WalletInfo,
+} from '../core/wallet.js';
 
 import {
   type WalletState,
@@ -29,53 +30,44 @@ import {
 
 console.log('[Lumen] Service worker starting...');
 
+// ============================================
+// State
+// ============================================
+
 // In-memory wallet state (cleared on restart)
 let walletState: WalletState = {
   hasWallet: false,
   network: 'devnet',
 };
 
-// In-memory seed (never persisted)
-let currentSeed: Uint8Array | null = null;
+// In-memory keys (never persisted)
+let currentKeys: WalletKeys | null = null;
+let currentWalletInfo: WalletInfo | null = null;
 
-// Helper: Create error response
+// ============================================
+// Helpers
+// ============================================
+
 function errorResponse(message: string, code: ErrorCode): LumenResponse {
   return { error: message, errorCode: code };
 }
 
-// Helper: Require wallet loaded
 function requireWallet(): void {
-  if (!walletState.hasWallet || !currentSeed) {
+  if (!walletState.hasWallet || !currentKeys) {
     throw new LumenError('No wallet loaded', 'NO_WALLET');
   }
 }
 
-// Helper: Derive address from seed
-function deriveAddress(seed: Uint8Array): string {
-  const walletResult = HDWallet.fromSeed(seed);
-  if (walletResult.type !== 'seedOk') {
-    throw new LumenError('Failed to derive wallet', 'UNKNOWN_ERROR');
-  }
-
-  // Derive the Dust key for the address (account 0, index 0)
-  const dustKey = walletResult.hdWallet
-    .selectAccount(0)
-    .selectRole(Roles.Dust)
-    .deriveKeyAt(0);
-
-  if (dustKey.type !== 'keyDerived') {
-    throw new LumenError('Failed to derive address key', 'UNKNOWN_ERROR');
-  }
-
-  // Convert key to hex address (simplified - real implementation would use address-format)
-  const hexAddress = Array.from(dustKey.key)
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-
-  return `0x${hexAddress.slice(0, 40)}`; // Truncate for display
+function getNetworkId(): string {
+  return walletState.network === 'custom'
+    ? 'custom'
+    : walletState.network;
 }
 
-// Message handlers
+// ============================================
+// Message Handlers
+// ============================================
+
 const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown> = {
   // Get current wallet state
   getState: () => {
@@ -89,76 +81,103 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
 
   // Generate new wallet
   generateWallet: () => {
-    const words = generateMnemonicWords();
-    const seed = generateRandomSeed();
+    const networkId = getNetworkId();
+    const result = createWallet(networkId);
 
-    currentSeed = seed;
+    if (!result.success) {
+      throw new LumenError(result.error, 'UNKNOWN_ERROR');
+    }
+
+    currentKeys = result.data.keys;
+    currentWalletInfo = result.data.info;
+
     walletState.hasWallet = true;
-    walletState.address = deriveAddress(seed);
+    walletState.address = result.data.info.address;
     walletState.balance = '0';
 
-    return { seedPhrase: words };
+    console.log('[Lumen] Wallet generated:', result.data.info.address);
+
+    return { seedPhrase: result.data.mnemonic };
   },
 
   // Import from seed phrase
   importFromSeed: (params: { seedPhrase: string }) => {
     const { seedPhrase } = params;
+    const networkId = getNetworkId();
 
-    if (!validateMnemonic(seedPhrase)) {
-      throw new LumenError('Invalid seed phrase', 'INVALID_INPUT');
+    const result = importFromMnemonic(seedPhrase, networkId);
+
+    if (!result.success) {
+      throw new LumenError(result.error, 'INVALID_INPUT');
     }
 
-    // Generate seed from mnemonic (simplified - real would use proper BIP39)
-    const seed = generateRandomSeed(); // TODO: Properly derive from mnemonic
+    currentKeys = result.data.keys;
+    currentWalletInfo = result.data.info;
 
-    currentSeed = seed;
     walletState.hasWallet = true;
-    walletState.address = deriveAddress(seed);
+    walletState.address = result.data.info.address;
     walletState.balance = '0';
 
-    return { success: true };
+    console.log('[Lumen] Wallet imported from seed:', result.data.info.address);
+
+    return { success: true, address: result.data.info.address };
   },
 
   // Import from private key
   importFromKey: (params: { privateKey: string }) => {
     const { privateKey } = params;
+    const networkId = getNetworkId();
 
-    // Validate hex format
-    const cleanKey = privateKey.replace(/^0x/, '');
-    if (!/^[0-9a-fA-F]{64}$/.test(cleanKey)) {
-      throw new LumenError('Invalid private key format', 'INVALID_INPUT');
+    const result = importFromPrivateKey(privateKey, networkId);
+
+    if (!result.success) {
+      throw new LumenError(result.error, 'INVALID_INPUT');
     }
 
-    // Convert hex to bytes
-    const seed = new Uint8Array(32);
-    for (let i = 0; i < 32; i++) {
-      seed[i] = parseInt(cleanKey.slice(i * 2, i * 2 + 2), 16);
-    }
+    currentKeys = result.data.keys;
+    currentWalletInfo = result.data.info;
 
-    currentSeed = seed;
     walletState.hasWallet = true;
-    walletState.address = deriveAddress(seed);
+    walletState.address = result.data.info.address;
     walletState.balance = '0';
 
-    return { success: true };
+    console.log('[Lumen] Wallet imported from key:', result.data.info.address);
+
+    return { success: true, address: result.data.info.address };
   },
 
   // Clear wallet
   clearWallet: () => {
-    currentSeed = null;
+    currentKeys = null;
+    currentWalletInfo = null;
+
     walletState = {
       hasWallet: false,
       network: walletState.network,
+      customRpcUrl: walletState.customRpcUrl,
     };
+
+    console.log('[Lumen] Wallet cleared');
+
     return { success: true };
   },
 
   // Set network
   setNetwork: (params: { network: NetworkId; customRpcUrl?: string }) => {
+    const previousNetwork = walletState.network;
     walletState.network = params.network;
+
     if (params.network === 'custom' && params.customRpcUrl) {
       walletState.customRpcUrl = params.customRpcUrl;
     }
+
+    // Re-derive address if wallet exists and network changed
+    if (currentKeys && currentWalletInfo && previousNetwork !== params.network) {
+      const networkId = getNetworkId();
+      // Note: In a full implementation, we'd re-encode the address for the new network
+      console.log('[Lumen] Network changed to:', networkId);
+    }
+
     return { success: true };
   },
 
@@ -175,6 +194,8 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
     }
 
     // TODO: Implement actual RPC health check
+    console.log('[Lumen] Test connection to:', rpcUrl);
+
     return { success: true, rpcUrl };
   },
 
@@ -215,17 +236,31 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
   // Sign transaction
   signTransaction: (params: { tx: unknown }) => {
     requireWallet();
-    // TODO: Implement actual transaction signing
-    console.log('[Lumen] Sign transaction:', params.tx);
-    return { signedTx: 'TODO_SIGNED_TX' };
+
+    const result = signTransaction(params.tx, currentKeys!.dustKey);
+
+    if (!result.success) {
+      throw new LumenError(result.error, 'UNKNOWN_ERROR');
+    }
+
+    console.log('[Lumen] Transaction signed');
+
+    return result.data;
   },
 
   // Sign message
   signMessage: (params: { message: string }) => {
     requireWallet();
-    // TODO: Implement actual message signing
-    console.log('[Lumen] Sign message:', params.message);
-    return { signature: 'TODO_SIGNATURE' };
+
+    const result = signMessage(params.message, currentKeys!.dustKey);
+
+    if (!result.success) {
+      throw new LumenError(result.error, 'UNKNOWN_ERROR');
+    }
+
+    console.log('[Lumen] Message signed:', params.message.slice(0, 20) + '...');
+
+    return result.data;
   },
 
   // Get network info
@@ -243,10 +278,13 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
   },
 };
 
-// Message listener
+// ============================================
+// Message Listener
+// ============================================
+
 chrome.runtime.onMessage.addListener((request: LumenRequest, _sender, sendResponse) => {
   const { method, params } = request;
-  console.log('[Lumen] Received message:', method, params);
+  console.log('[Lumen] Received message:', method);
 
   const handler = handlers[method];
   if (!handler) {
@@ -278,7 +316,10 @@ chrome.runtime.onMessage.addListener((request: LumenRequest, _sender, sendRespon
   return true;
 });
 
-// Log on install
+// ============================================
+// Lifecycle
+// ============================================
+
 chrome.runtime.onInstalled.addListener(() => {
   console.log('[Lumen] Extension installed');
 });
