@@ -9,7 +9,7 @@ body {
   font-size: 14px;
   background: #1a1a2e;
   color: #eee;
-  width: 320px;
+  width: 480px;
   min-height: 400px;
 }
 
@@ -576,7 +576,7 @@ button.icon-btn:hover {
 }
 
 .coin-detail .truncate {
-  max-width: 120px;
+  max-width: 280px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

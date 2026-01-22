@@ -68,7 +68,7 @@ const elements = {
 
 // State
 let currentSeedPhrase: string[] | null = null;
-let debugPanelVisible = false;
+let debugPanelVisible = true;
 let debugPollingInterval: ReturnType<typeof setInterval> | null = null;
 const DEBUG_POLL_INTERVAL_MS = 1000;
 
@@ -711,3 +711,8 @@ elements.debugTabs.forEach((tab) => {
 
 // Initialize
 loadWalletState();
+
+// Start debug panel polling (debug panel is always visible)
+elements.btnDebugToggle.classList.add('active');
+updateDebugPanel();
+debugPollingInterval = setInterval(updateDebugPanel, DEBUG_POLL_INTERVAL_MS);
