@@ -26,10 +26,17 @@
 
 ## 4. Testing
 
-- [ ] 4.1 Test wallet creation with facade
-- [ ] 4.2 Test balance query on localnet with prefunded wallet
+- [x] 4.1 Test wallet creation with facade
+- [x] 4.2 Test balance query on localnet with prefunded wallet
 - [ ] 4.3 Test network switching
 - [ ] 4.4 Test service worker restart recovery
+
+## 5. Auto-refresh Balance
+
+- [x] 5.1 Add getBalanceNonBlocking() to facade
+- [x] 5.2 Add balance polling interval (1 second)
+- [x] 5.3 Broadcast balance updates to popup
+- [x] 5.4 Initialize facade automatically on wallet import
 
 ## Implementation Notes
 
