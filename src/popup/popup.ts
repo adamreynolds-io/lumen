@@ -38,7 +38,6 @@ const elements = {
   btnImportHex: document.getElementById('btn-import-hex')!,
   btnCopy: document.getElementById('btn-copy')!,
   btnCopySeed: document.getElementById('btn-copy-seed')!,
-  btnRefresh: document.getElementById('btn-refresh')!,
   btnClearWallet: document.getElementById('btn-clear-wallet')!,
   btnConfirmSeed: document.getElementById('btn-confirm-seed')!,
   btnDoImportSeed: document.getElementById('btn-do-import-seed')!,
@@ -374,19 +373,6 @@ elements.btnCopy.addEventListener('click', async () => {
   if (address && address !== '-') {
     await navigator.clipboard.writeText(address);
     showStatus('Address copied', 'success');
-  }
-});
-
-// Event: Refresh balance
-elements.btnRefresh.addEventListener('click', async () => {
-  try {
-    elements.walletBalance.textContent = 'Loading...';
-    const balance = (await sendMessage('refreshBalance')) as { total: string };
-    elements.walletBalance.textContent = balance.total;
-    showStatus('Balance refreshed', 'success');
-  } catch (error) {
-    elements.walletBalance.textContent = 'Error';
-    showStatus(`Failed to refresh: ${error}`, 'error');
   }
 });
 
