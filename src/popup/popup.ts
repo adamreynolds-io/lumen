@@ -39,7 +39,6 @@ const elements = {
   btnCopy: document.getElementById('btn-copy')!,
   btnCopySeed: document.getElementById('btn-copy-seed')!,
   btnRefresh: document.getElementById('btn-refresh')!,
-  btnTestConnection: document.getElementById('btn-test-connection')!,
   btnClearWallet: document.getElementById('btn-clear-wallet')!,
   btnConfirmSeed: document.getElementById('btn-confirm-seed')!,
   btnDoImportSeed: document.getElementById('btn-do-import-seed')!,
@@ -379,25 +378,6 @@ elements.networkSelect.addEventListener('change', async () => {
     } catch (error) {
       showStatus(`Failed to switch network: ${error}`, 'error');
     }
-  }
-});
-
-// Event: Test connection
-elements.btnTestConnection.addEventListener('click', async () => {
-  try {
-    showStatus('Testing connection...', 'info');
-    const status = (await sendMessage('testConnection')) as {
-      connected: boolean;
-      blockHeight?: number;
-      error?: string;
-    };
-    if (status.connected) {
-      showStatus(`Connected (block ${status.blockHeight})`, 'success');
-    } else {
-      showStatus(`Connection failed: ${status.error}`, 'error');
-    }
-  } catch (error) {
-    showStatus(`Connection failed: ${error}`, 'error');
   }
 });
 
