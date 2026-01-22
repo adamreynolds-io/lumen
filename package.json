@@ -6,7 +6,11 @@
   "scripts": {
     "build": "node build.mjs",
     "dev": "node build.mjs --watch",
-    "test": "tsx test/wallet.test.ts"
+    "test": "tsx test/wallet.test.ts",
+    "localnet:up": "docker compose up -d",
+    "localnet:down": "docker compose down",
+    "localnet:logs": "docker compose logs -f",
+    "localnet:reset": "docker compose down -v && docker compose up -d"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.268",

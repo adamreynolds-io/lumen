@@ -1,0 +1,76 @@
+version: "3.8"
+
+services:
+  node:
+    image: ghcr.io/midnight-ntwrk/midnight-node:0.20.0-rc.1
+    ports:
+      - "127.0.0.1:9944:9944"
+    environment:
+      - RUST_BACKTRACE=1
+    command:
+      - "--dev"
+      - "--rpc-external"
+      - "--rpc-cors=all"
+      - "--rpc-methods=unsafe"
+    volumes:
+      - node-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9944/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+    security_opt:
+      - no-new-privileges:true
+
+  indexer:
+    image: ghcr.io/midnight-ntwrk/indexer-standalone:3.0.0-alpha.25
+    ports:
+      - "127.0.0.1:8088:8088"
+    environment:
+      - RUST_BACKTRACE=1
+      - RUST_LOG=info
+      - NETWORK_ID=undeployed
+      - NODE_URL=ws://node:9944
+      - APP_INFRA_SECRET=${APP_INFRA_SECRET}
+    depends_on:
+      node:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "test", "-f", "/var/run/indexer-standalone/running"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+  proof-server:
+    image: ghcr.io/midnight-ntwrk/proof-server:7.0.0-rc.1
+    ports:
+      - "127.0.0.1:6300:6300"
+    environment:
+      - RUST_BACKTRACE=full
+      - RUST_LOG=info,proof_server=debug
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6300/version"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  node-data:
+    name: lumen-node-data
