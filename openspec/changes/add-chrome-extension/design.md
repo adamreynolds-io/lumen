@@ -55,7 +55,7 @@ Bridge between web pages and the extension:
 
 Exposes `window.midnight` API to dApps:
 
-- Implements midnight-dapp-connector-api interface
+- Implements dapp-connector-api interface
 - Communicates with content script via `window.postMessage`
 - No direct access to extension APIs (isolated context)
 

@@ -4,7 +4,7 @@
 
 **Midnight Lumen** is a developer wallet for the Midnight blockchain ecosystem. It serves multiple purposes:
 
-1. **QA Testing Tool**: Chrome plugin and local service for QA teams to validate devnet and testnet releases of the midnight-dapp-connector-api and midnight-wallet
+1. **QA Testing Tool**: Chrome plugin and local service for QA teams to validate devnet and testnet releases of the dapp-connector-api and wallet-sdk
 2. **Reference Implementation**: Example wallet for wallet builders to follow when integrating with Midnight
 3. **Server-side Wallet** (future): Potential production use for holding DUST tokens to pay gas fees
 
@@ -61,13 +61,13 @@
 
 ### Key Integration Points
 
-- **midnight-dapp-connector-api**: Standard interface for dApps to request wallet operations
-- **midnight-wallet**: Production wallet that Lumen helps test and validates compatibility with
+- **dapp-connector-api**: Standard interface for dApps to request wallet operations
+- **wallet-sdk**: SDK that Lumen helps test and validates compatibility with
 
 ## Important Constraints
 
 - Must be compatible with Chrome Extension Manifest V3
-- Must implement the midnight-dapp-connector-api specification exactly
+- Must implement the dapp-connector-api specification exactly
 - Designed for development/QA use - security posture appropriate for non-production initially
 - Should support both browser plugin and local service modes
 
@@ -103,8 +103,8 @@ These packages only have pre-release versions (use with caution, API may change)
 ### Reference Repositories
 
 These repos are for reference only (understanding specs, reviewing implementations):
-- https://github.com/midnightntwrk/midnight-dapp-connector-api
-- https://github.com/midnightntwrk/midnight-wallet
+- https://github.com/midnightntwrk/dapp-connector-api
+- https://github.com/midnightntwrk/wallet-sdk
 
 ### Other
 

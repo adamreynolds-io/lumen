@@ -6,7 +6,7 @@ Implement the Lumen developer wallet as a Chrome extension (Manifest V3) that en
 
 ## Motivation
 
-QA teams need a reliable, configurable wallet to validate releases of the midnight-dapp-connector-api and midnight-wallet. Currently there is no lightweight developer-focused wallet for testing. Lumen fills this gap as both a testing tool and a reference implementation for wallet builders.
+QA teams need a reliable, configurable wallet to validate releases of the dapp-connector-api and wallet-sdk. Currently there is no lightweight developer-focused wallet for testing. Lumen fills this gap as both a testing tool and a reference implementation for wallet builders.
 
 ## Scope
 
@@ -36,7 +36,7 @@ Build a minimal but complete Chrome extension following Manifest V3 patterns:
 3. **Popup UI**: Developer interface for wallet management and network config
 4. **Message Passing**: Secure communication between components
 
-The wallet will implement the midnight-dapp-connector-api specification for dApp interoperability.
+The wallet will implement the dapp-connector-api specification for dApp interoperability.
 
 ## Capabilities
 
@@ -44,7 +44,7 @@ The wallet will implement the midnight-dapp-connector-api specification for dApp
 |------------|-------------|
 | extension-core | Chrome extension infrastructure and build setup |
 | wallet-management | Key generation, import, and session storage |
-| dapp-connector | Full midnight-dapp-connector-api implementation |
+| dapp-connector | Full dapp-connector-api implementation |
 | network-config | Custom RPC endpoint configuration |
 
 ## Risks

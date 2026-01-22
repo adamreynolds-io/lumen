@@ -81,7 +81,7 @@
 ## Phase 7: Integration & Polish
 
 - [ ] End-to-end test: generate wallet → connect dApp → sign transaction
-- [ ] Test with midnight-dapp-connector-api example if available
+- [ ] Test with dapp-connector-api example if available
 - [ ] Handle edge cases (network errors, invalid inputs)
 - [ ] Add loading states and error messages
 - [ ] README with usage instructions
@@ -100,5 +100,5 @@
 ## Notes
 
 - Keep Midnight SDK integration minimal initially; may need adjustments based on actual SDK APIs
-- Validate against actual midnight-dapp-connector-api spec once reviewed
+- Validate against actual dapp-connector-api spec once reviewed
 - Consider adding dev tools logging for debugging dApp interactions

@@ -1,6 +1,6 @@
 # dapp-connector
 
-Implementation of midnight-dapp-connector-api for dApp interoperability.
+Implementation of dapp-connector-api for dApp interoperability.
 
 ## ADDED Requirements
 
