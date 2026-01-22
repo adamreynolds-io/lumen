@@ -157,6 +157,28 @@ export class LumenFacade {
   }
 
   /**
+   * Get balance from current state without waiting for sync.
+   * Returns null if wallet is not ready or no state available.
+   */
+  async getBalanceNonBlocking(): Promise<DustBalance | null> {
+    const state = await this.getCurrentState();
+    if (!state) {
+      return null;
+    }
+
+    try {
+      const total = state.walletBalance(new Date());
+      const pendingCoins = state.pendingCoins;
+      const pending = pendingCoins.reduce((sum, coin) => sum + coin.initialValue, 0n);
+      const available = total - pending;
+
+      return { total, available, pending };
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Get the DUST address for this wallet.
    */
   getDustAddress(): string {

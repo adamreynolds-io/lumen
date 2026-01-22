@@ -391,5 +391,12 @@ elements.btnClearWallet.addEventListener('click', async () => {
   }
 });
 
+// Listen for balance updates from service worker
+chrome.runtime.onMessage.addListener((message) => {
+  if (message.type === 'balanceUpdate' && message.balance) {
+    elements.walletBalance.textContent = message.balance.total;
+  }
+});
+
 // Initialize
 loadWalletState();

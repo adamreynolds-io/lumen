@@ -76,6 +76,10 @@ let currentWalletInfo: WalletInfo | null = null;
 // Wallet facade for SDK operations (balance queries, etc.)
 let facade: LumenFacade | null = null;
 
+// Balance polling interval
+let balancePollingInterval: ReturnType<typeof setInterval> | null = null;
+const BALANCE_POLL_INTERVAL_MS = 1000;
+
 // ============================================
 // Helpers
 // ============================================
@@ -97,11 +101,65 @@ function getNetworkId(): string {
 }
 
 /**
+ * Broadcast balance update to all extension pages (popup, etc.)
+ */
+function broadcastBalanceUpdate(balance: { total: string; available: string; pending: string }): void {
+  chrome.runtime.sendMessage({
+    type: 'balanceUpdate',
+    balance,
+  }).catch(() => {
+    // Ignore errors when no listeners (popup closed)
+  });
+}
+
+/**
+ * Start polling for balance updates.
+ */
+function startBalancePolling(): void {
+  // Clear any existing interval
+  stopBalancePolling();
+
+  balancePollingInterval = setInterval(async () => {
+    if (!facade) return;
+
+    try {
+      const balance = await facade.getBalanceNonBlocking();
+      if (balance) {
+        const balanceStr = {
+          total: balance.total.toString(),
+          available: balance.available.toString(),
+          pending: balance.pending.toString(),
+        };
+
+        // Update wallet state
+        walletState.balance = balanceStr.total;
+
+        // Broadcast to popup
+        broadcastBalanceUpdate(balanceStr);
+      }
+    } catch (e) {
+      // Silently ignore polling errors
+    }
+  }, BALANCE_POLL_INTERVAL_MS);
+}
+
+/**
+ * Stop balance polling.
+ */
+function stopBalancePolling(): void {
+  if (balancePollingInterval) {
+    clearInterval(balancePollingInterval);
+    balancePollingInterval = null;
+  }
+}
+
+/**
  * Initialize or reinitialize the wallet facade.
  * Called when wallet is loaded or network changes.
  */
 async function initializeFacade(): Promise<void> {
-  // Stop existing facade if any
+  // Stop existing facade and polling if any
+  stopBalancePolling();
   if (facade) {
     try {
       await facade.stop();
@@ -134,6 +192,9 @@ async function initializeFacade(): Promise<void> {
   try {
     await facade.start();
     console.log('[Lumen] Facade initialized and syncing');
+
+    // Start balance polling
+    startBalancePolling();
   } catch (e) {
     console.error('[Lumen] Failed to start facade:', e);
     facade = null;
@@ -156,7 +217,7 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
   },
 
   // Generate new wallet
-  generateWallet: () => {
+  generateWallet: async () => {
     const networkId = getNetworkId();
     const result = createWallet(networkId);
 
@@ -173,11 +234,14 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
 
     console.log('[Lumen] Wallet generated:', result.data.info.address);
 
+    // Initialize facade and start balance polling
+    await initializeFacade();
+
     return { seedPhrase: result.data.mnemonic };
   },
 
   // Import from seed phrase
-  importFromSeed: (params: { seedPhrase: string }) => {
+  importFromSeed: async (params: { seedPhrase: string }) => {
     const { seedPhrase } = params;
     const networkId = getNetworkId();
 
@@ -196,11 +260,14 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
 
     console.log('[Lumen] Wallet imported from seed:', result.data.info.address);
 
+    // Initialize facade and start balance polling
+    await initializeFacade();
+
     return { success: true, address: result.data.info.address };
   },
 
   // Import from private key
-  importFromKey: (params: { privateKey: string }) => {
+  importFromKey: async (params: { privateKey: string }) => {
     const { privateKey } = params;
     const networkId = getNetworkId();
 
@@ -219,6 +286,9 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
 
     console.log('[Lumen] Wallet imported from key:', result.data.info.address);
 
+    // Initialize facade and start balance polling
+    await initializeFacade();
+
     return { success: true, address: result.data.info.address };
   },
 
@@ -231,7 +301,7 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
   },
 
   // Import a prefunded localnet wallet
-  importLocalnetWallet: (params: { walletName: string }) => {
+  importLocalnetWallet: async (params: { walletName: string }) => {
     console.log('[Lumen] importLocalnetWallet called with:', params);
     const { walletName } = params;
     const seed = LOCALNET_SEEDS[walletName];
@@ -268,11 +338,14 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
 
     console.log('[Lumen] Localnet wallet imported:', walletName, result.data.info.address);
 
+    // Initialize facade and start balance polling
+    await initializeFacade();
+
     return { success: true, address: result.data.info.address, walletName };
   },
 
   // Import from hex seed (custom seed)
-  importFromHexSeed: (params: { hexSeed: string }) => {
+  importFromHexSeed: async (params: { hexSeed: string }) => {
     const { hexSeed } = params;
     const networkId = getNetworkId();
 
@@ -291,12 +364,16 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
 
     console.log('[Lumen] Wallet imported from hex seed:', result.data.info.address);
 
+    // Initialize facade and start balance polling
+    await initializeFacade();
+
     return { success: true, address: result.data.info.address };
   },
 
   // Clear wallet
   clearWallet: async () => {
-    // Stop facade if running
+    // Stop balance polling and facade
+    stopBalancePolling();
     if (facade) {
       try {
         await facade.stop();
