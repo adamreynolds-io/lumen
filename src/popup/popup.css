@@ -45,19 +45,26 @@ header h1 {
 
 .header-btn {
   margin-left: auto;
-  padding: 4px 8px;
-  font-size: 14px;
+  padding: 6px;
   background: transparent;
   border: 1px solid transparent;
   border-radius: 4px;
   cursor: pointer;
-  opacity: 0.7;
+  opacity: 0.6;
   transition: opacity 0.2s, background 0.2s;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .header-btn:hover {
   opacity: 1;
   background: #2a2a3e;
+}
+
+.header-btn svg {
+  display: block;
 }
 
 .version {
@@ -324,14 +331,17 @@ button.icon-btn:hover {
 
 /* Debug Toggle Button */
 .debug-toggle {
-  padding: 4px 8px;
-  font-size: 14px;
+  padding: 6px;
   background: transparent;
   border: 1px solid transparent;
   border-radius: 4px;
   cursor: pointer;
-  opacity: 0.5;
+  opacity: 0.6;
   transition: opacity 0.2s, background 0.2s;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .debug-toggle:hover {
@@ -343,6 +353,10 @@ button.icon-btn:hover {
   opacity: 1;
   background: #2a2a3e;
   border-color: #667eea;
+}
+
+.debug-toggle svg {
+  display: block;
 }
 
 /* Debug Panel */
