@@ -28,14 +28,16 @@
 
 **Note**: Using latest beta versions for all @midnight-ntwrk packages.
 
-## Phase 2: Core Infrastructure
+## Phase 2: Core Infrastructure ✅
 
-- [ ] Implement message passing utilities (src/lib/messaging.ts)
-- [ ] Define shared types (src/core/types.ts)
-- [ ] Create service worker skeleton (src/background/service-worker.ts)
-- [ ] Create content script skeleton (src/content/content.ts)
-- [ ] Create injected script skeleton (src/inject/inject.ts)
-- [ ] Verify message flow: inject → content → service worker → response
+- [x] Implement message passing utilities (src/lib/messaging.ts)
+- [x] Define shared types (src/core/types.ts)
+- [x] Create service worker skeleton (src/background/service-worker.ts)
+- [x] Create content script skeleton (src/content/content.ts)
+- [x] Create injected script skeleton (src/inject/inject.ts)
+- [x] Verify message flow: inject → content → service worker → response
+
+**Verified**: Test page at `test/dapp-test.html` confirms full message flow working.
 
 ## Phase 3: Wallet Core
 

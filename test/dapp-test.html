@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lumen dApp Connector Test</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      padding: 20px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    h1 { margin-bottom: 20px; }
+    h2 { margin: 20px 0 10px; font-size: 16px; color: #888; }
+    .status {
+      padding: 10px;
+      border-radius: 4px;
+      margin-bottom: 20px;
+    }
+    .status.connected { background: #1a3a2a; color: #4caf50; }
+    .status.disconnected { background: #3a1a1a; color: #f44336; }
+    .status.pending { background: #3a3a1a; color: #f0ad4e; }
+    button {
+      padding: 10px 16px;
+      margin: 4px;
+      font-size: 14px;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover { opacity: 0.9; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .result {
+      background: #2a2a3e;
+      padding: 12px;
+      border-radius: 4px;
+      margin-top: 10px;
+      font-family: 'SF Mono', Monaco, monospace;
+      font-size: 13px;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .error { color: #f44336; }
+    .success { color: #4caf50; }
+    .actions { margin: 10px 0; }
+    input {
+      padding: 8px;
+      font-size: 14px;
+      background: #2a2a3e;
+      border: 1px solid #444;
+      border-radius: 4px;
+      color: #eee;
+      width: 300px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🌙 Lumen dApp Connector Test</h1>
+
+  <div id="status" class="status disconnected">
+    Checking for Lumen wallet...
+  </div>
+
+  <h2>Connection</h2>
+  <div class="actions">
+    <button id="btn-enable">enable()</button>
+    <button id="btn-disable">disable()</button>
+    <button id="btn-is-enabled">isEnabled()</button>
+  </div>
+
+  <h2>Wallet Info</h2>
+  <div class="actions">
+    <button id="btn-address">getAddress()</button>
+    <button id="btn-balance">getBalance()</button>
+    <button id="btn-network">getNetwork()</button>
+  </div>
+
+  <h2>Signing</h2>
+  <div class="actions">
+    <input type="text" id="message-input" placeholder="Message to sign" value="Hello, Midnight!">
+    <button id="btn-sign-message">signMessage()</button>
+  </div>
+  <div class="actions">
+    <button id="btn-sign-tx">signTransaction({ test: true })</button>
+  </div>
+
+  <h2>Result</h2>
+  <div id="result" class="result">Results will appear here...</div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const resultEl = document.getElementById('result');
+
+    function showResult(label, data, isError = false) {
+      const className = isError ? 'error' : 'success';
+      resultEl.innerHTML = `<span class="${className}">${label}:</span>\n${JSON.stringify(data, null, 2)}`;
+      console.log(label, data);
+    }
+
+    function updateStatus(connected) {
+      if (connected) {
+        statusEl.textContent = '✓ Lumen wallet detected and connected';
+        statusEl.className = 'status connected';
+      } else {
+        statusEl.textContent = '✗ Lumen wallet not connected';
+        statusEl.className = 'status disconnected';
+      }
+    }
+
+    async function callMethod(name, fn) {
+      resultEl.innerHTML = `Calling ${name}...`;
+      try {
+        const result = await fn();
+        showResult(name, result);
+        return result;
+      } catch (err) {
+        showResult(`${name} ERROR`, { message: err.message, code: err.code }, true);
+        throw err;
+      }
+    }
+
+    // Wait for Lumen to be ready
+    function waitForLumen(timeout = 3000) {
+      return new Promise((resolve) => {
+        if (window.midnight) {
+          resolve(window.midnight);
+          return;
+        }
+
+        const handler = () => {
+          window.removeEventListener('midnight#ready', handler);
+          resolve(window.midnight);
+        };
+        window.addEventListener('midnight#ready', handler);
+
+        setTimeout(() => {
+          window.removeEventListener('midnight#ready', handler);
+          resolve(window.midnight);
+        }, timeout);
+      });
+    }
+
+    // Initialize
+    async function init() {
+      statusEl.textContent = 'Waiting for Lumen wallet...';
+      statusEl.className = 'status pending';
+
+      const midnight = await waitForLumen();
+
+      if (!midnight) {
+        statusEl.textContent = '✗ Lumen wallet not detected. Is the extension installed?';
+        statusEl.className = 'status disconnected';
+        return;
+      }
+
+      statusEl.textContent = `✓ Lumen wallet detected (isLumen: ${midnight.isLumen})`;
+      statusEl.className = 'status connected';
+
+      // Check if already enabled
+      try {
+        const enabled = await midnight.isEnabled();
+        updateStatus(enabled);
+      } catch (e) {
+        console.log('isEnabled check failed:', e);
+      }
+
+      // Button handlers
+      document.getElementById('btn-enable').onclick = async () => {
+        const result = await callMethod('enable()', () => midnight.enable());
+        updateStatus(result?.enabled);
+      };
+
+      document.getElementById('btn-disable').onclick = () =>
+        callMethod('disable()', () => midnight.disable());
+
+      document.getElementById('btn-is-enabled').onclick = async () => {
+        const enabled = await callMethod('isEnabled()', () => midnight.isEnabled());
+        updateStatus(enabled);
+      };
+
+      document.getElementById('btn-address').onclick = () =>
+        callMethod('getAddress()', () => midnight.getAddress());
+
+      document.getElementById('btn-balance').onclick = () =>
+        callMethod('getBalance()', () => midnight.getBalance());
+
+      document.getElementById('btn-network').onclick = () =>
+        callMethod('getNetwork()', () => midnight.getNetwork());
+
+      document.getElementById('btn-sign-message').onclick = () => {
+        const message = document.getElementById('message-input').value;
+        callMethod('signMessage()', () => midnight.signMessage(message));
+      };
+
+      document.getElementById('btn-sign-tx').onclick = () =>
+        callMethod('signTransaction()', () => midnight.signTransaction({ test: true, amount: 100 }));
+    }
+
+    init();
+  </script>
+</body>
+</html>
