@@ -611,11 +611,18 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
 
   // Get connection status for debug display
   getConnectionStatus: async (): Promise<ConnectionStatus> => {
+    const unknownHealth = {
+      status: 'unknown' as const,
+      latency: null,
+      lastChecked: null,
+      error: null,
+    };
+
     if (!facade) {
       return {
-        indexerWs: 'disconnected',
-        nodeRpc: 'unknown',
-        lastError: null,
+        node: unknownHealth,
+        indexer: unknownHealth,
+        prover: unknownHealth,
       };
     }
 

@@ -9,6 +9,12 @@ import { DustWallet, DustWalletState } from '@midnight-ntwrk/wallet-sdk-dust-wal
 import { DustSecretKey, LedgerParameters } from '@midnight-ntwrk/ledger-v7';
 import { firstValueFrom } from 'rxjs';
 import { take } from 'rxjs/operators';
+import {
+  type ServiceHealth,
+  checkNodeHealth,
+  checkIndexerHealth,
+  checkProverHealth,
+} from './network.js';
 
 // ============================================
 // Types
@@ -101,12 +107,12 @@ export interface DebugState {
 }
 
 export interface ConnectionStatus {
-  /** Indexer WebSocket status */
-  indexerWs: 'connected' | 'connecting' | 'disconnected' | 'unknown';
-  /** Node RPC status */
-  nodeRpc: 'connected' | 'disconnected' | 'unknown';
-  /** Last error message if any */
-  lastError: string | null;
+  /** Node RPC health */
+  node: ServiceHealth;
+  /** Indexer health */
+  indexer: ServiceHealth;
+  /** Prover health */
+  prover: ServiceHealth;
 }
 
 // ============================================
@@ -434,43 +440,44 @@ export class LumenFacade {
 
   /**
    * Get connection status for debug display.
-   * Checks both indexer (via wallet state) and node RPC (via health endpoint).
+   * Performs health checks on all services: node, indexer, and prover.
    */
   async getConnectionStatus(): Promise<ConnectionStatus> {
+    const now = new Date().toISOString();
+
+    const unknownHealth: ServiceHealth = {
+      status: 'unknown',
+      latency: null,
+      lastChecked: null,
+      error: null,
+    };
+
     if (!this.dustWallet) {
       return {
-        indexerWs: 'disconnected',
-        nodeRpc: 'unknown',
-        lastError: null,
+        node: unknownHealth,
+        indexer: unknownHealth,
+        prover: unknownHealth,
       };
     }
 
-    // Try to get state - if we can, indexer is connected
-    const state = await this.getCurrentState();
-    const indexerWs = state ? 'connected' : 'connecting';
+    // Run all health checks in parallel
+    const [nodeResult, indexerResult, proverResult] = await Promise.all([
+      checkNodeHealth(this.config.nodeUrl),
+      checkIndexerHealth(this.config.indexerHttpUrl),
+      checkProverHealth(this.config.proverUrl),
+    ]);
 
-    // Check node RPC by calling health endpoint
-    let nodeRpc: 'connected' | 'disconnected' | 'unknown' = 'unknown';
-    try {
-      const response = await fetch(this.config.nodeUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          method: 'system_health',
-          params: [],
-          id: 1,
-        }),
-      });
-      nodeRpc = response.ok ? 'connected' : 'disconnected';
-    } catch {
-      nodeRpc = 'disconnected';
-    }
+    const toServiceHealth = (result: { success: boolean; latency: number; error?: string }): ServiceHealth => ({
+      status: result.success ? 'healthy' : 'unhealthy',
+      latency: result.latency,
+      lastChecked: now,
+      error: result.error ?? null,
+    });
 
     return {
-      indexerWs,
-      nodeRpc,
-      lastError: null,
+      node: toServiceHealth(nodeResult),
+      indexer: toServiceHealth(indexerResult),
+      prover: toServiceHealth(proverResult),
     };
   }
 }

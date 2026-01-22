@@ -33,6 +33,34 @@ export interface BalanceInfo {
 }
 
 // ============================================
+// Health Check Types
+// ============================================
+
+export type ServiceStatus = 'healthy' | 'degraded' | 'unhealthy' | 'unknown';
+
+export interface ServiceHealth {
+  /** Current service status */
+  status: ServiceStatus;
+  /** Response latency in ms (if available) */
+  latency: number | null;
+  /** ISO timestamp of last successful check */
+  lastChecked: string | null;
+  /** Error message if unhealthy */
+  error: string | null;
+}
+
+export interface HealthCheckResult {
+  /** Whether the check succeeded */
+  success: boolean;
+  /** Response latency in ms */
+  latency: number;
+  /** Error message if failed */
+  error?: string;
+  /** Additional data from the check */
+  data?: Record<string, unknown>;
+}
+
+// ============================================
 // Storage Keys
 // ============================================
 
@@ -290,5 +318,171 @@ export function isValidRpcUrl(url: string): boolean {
     );
   } catch {
     return false;
+  }
+}
+
+// ============================================
+// Health Check Functions
+// ============================================
+
+const HEALTH_CHECK_TIMEOUT = 5000;
+
+/**
+ * Check node health via /health endpoint and RPC call.
+ */
+export async function checkNodeHealth(nodeUrl: string): Promise<HealthCheckResult> {
+  const startTime = Date.now();
+
+  try {
+    // Convert WS URL to HTTP for health check
+    const httpUrl = nodeUrl
+      .replace('wss://', 'https://')
+      .replace('ws://', 'http://');
+
+    // Check /health endpoint
+    const healthResponse = await fetch(`${httpUrl}/health`, {
+      method: 'GET',
+      signal: AbortSignal.timeout(HEALTH_CHECK_TIMEOUT),
+    });
+
+    if (!healthResponse.ok) {
+      return {
+        success: false,
+        latency: Date.now() - startTime,
+        error: `Health endpoint returned ${healthResponse.status}`,
+      };
+    }
+
+    const health = await healthResponse.json();
+
+    // Also verify RPC is responding
+    const rpcResponse = await fetch(httpUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'system_health',
+        params: [],
+        id: 1,
+      }),
+      signal: AbortSignal.timeout(HEALTH_CHECK_TIMEOUT),
+    });
+
+    if (!rpcResponse.ok) {
+      return {
+        success: false,
+        latency: Date.now() - startTime,
+        error: `RPC returned ${rpcResponse.status}`,
+      };
+    }
+
+    const rpcData = await rpcResponse.json();
+    const latency = Date.now() - startTime;
+
+    return {
+      success: true,
+      latency,
+      data: {
+        isSyncing: health.isSyncing ?? rpcData.result?.isSyncing,
+        peers: rpcData.result?.peers,
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      latency: Date.now() - startTime,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
+/**
+ * Check indexer health via HTTP GraphQL endpoint.
+ */
+export async function checkIndexerHealth(indexerHttpUrl: string): Promise<HealthCheckResult> {
+  const startTime = Date.now();
+
+  try {
+    // Simple GraphQL introspection query to verify indexer is responding
+    const response = await fetch(indexerHttpUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query: '{ __typename }',
+      }),
+      signal: AbortSignal.timeout(HEALTH_CHECK_TIMEOUT),
+    });
+
+    const latency = Date.now() - startTime;
+
+    if (!response.ok) {
+      return {
+        success: false,
+        latency,
+        error: `Indexer returned ${response.status}`,
+      };
+    }
+
+    const data = await response.json();
+
+    // Check for GraphQL errors
+    if (data.errors && data.errors.length > 0) {
+      return {
+        success: false,
+        latency,
+        error: data.errors[0].message || 'GraphQL error',
+      };
+    }
+
+    return {
+      success: true,
+      latency,
+      data: { typename: data.data?.__typename },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      latency: Date.now() - startTime,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
+/**
+ * Check prover health via /version endpoint.
+ */
+export async function checkProverHealth(proverUrl: string): Promise<HealthCheckResult> {
+  const startTime = Date.now();
+
+  try {
+    // Prover exposes /version endpoint
+    const response = await fetch(`${proverUrl}/version`, {
+      method: 'GET',
+      signal: AbortSignal.timeout(HEALTH_CHECK_TIMEOUT),
+    });
+
+    const latency = Date.now() - startTime;
+
+    if (!response.ok) {
+      return {
+        success: false,
+        latency,
+        error: `Prover returned ${response.status}`,
+      };
+    }
+
+    const version = await response.text();
+
+    return {
+      success: true,
+      latency,
+      data: { version: version.trim() },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      latency: Date.now() - startTime,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
   }
 }

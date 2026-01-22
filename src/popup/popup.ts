@@ -60,8 +60,9 @@ const elements = {
   debugBalancePending: document.getElementById('debug-balance-pending')!,
   debugCoinCount: document.getElementById('debug-coin-count')!,
   debugCoinList: document.getElementById('debug-coin-list')!,
-  debugIndexerStatus: document.getElementById('debug-indexer-status')!,
   debugNodeStatus: document.getElementById('debug-node-status')!,
+  debugIndexerStatus: document.getElementById('debug-indexer-status')!,
+  debugProverStatus: document.getElementById('debug-prover-status')!,
   debugTabs: document.querySelectorAll('.debug-tab'),
   tabContents: document.querySelectorAll('.tab-content'),
 };
@@ -443,10 +444,19 @@ interface DebugState {
   facadeStartTime: string | null;
 }
 
+type ServiceStatus = 'healthy' | 'degraded' | 'unhealthy' | 'unknown';
+
+interface ServiceHealth {
+  status: ServiceStatus;
+  latency: number | null;
+  lastChecked: string | null;
+  error: string | null;
+}
+
 interface ConnectionStatus {
-  indexerWs: 'connected' | 'connecting' | 'disconnected' | 'unknown';
-  nodeRpc: 'connected' | 'disconnected' | 'unknown';
-  lastError: string | null;
+  node: ServiceHealth;
+  indexer: ServiceHealth;
+  prover: ServiceHealth;
 }
 
 // Format large numbers with commas
@@ -547,8 +557,9 @@ async function updateDebugPanel(): Promise<void> {
 
     // Update connection status
     if (connectionStatus) {
-      updateConnectionIndicator(elements.debugIndexerStatus, connectionStatus.indexerWs);
-      updateConnectionIndicator(elements.debugNodeStatus, connectionStatus.nodeRpc);
+      updateHealthIndicator(elements.debugNodeStatus, connectionStatus.node);
+      updateHealthIndicator(elements.debugIndexerStatus, connectionStatus.indexer);
+      updateHealthIndicator(elements.debugProverStatus, connectionStatus.prover);
     }
   } catch (error) {
     console.error('[Lumen] Failed to update debug panel:', error);
@@ -618,13 +629,25 @@ function renderCoinItem(coin: CoinInfo, index: number): string {
   `;
 }
 
-// Update a connection status indicator
-function updateConnectionIndicator(
-  element: HTMLElement,
-  status: 'connected' | 'connecting' | 'disconnected' | 'unknown' | 'error'
-): void {
-  element.textContent = status.charAt(0).toUpperCase() + status.slice(1);
-  element.className = `status-indicator ${status}`;
+// Update a connection status indicator with health info
+function updateHealthIndicator(element: HTMLElement, health: ServiceHealth): void {
+  // Map ServiceStatus to display class
+  const statusMap: Record<ServiceStatus, string> = {
+    healthy: 'connected',
+    degraded: 'connecting',
+    unhealthy: 'disconnected',
+    unknown: 'unknown',
+  };
+
+  const displayClass = statusMap[health.status];
+  const displayText = health.status.charAt(0).toUpperCase() + health.status.slice(1);
+
+  // Add latency if available
+  const latencyText = health.latency !== null ? ` (${health.latency}ms)` : '';
+
+  element.textContent = displayText + latencyText;
+  element.className = `status-indicator ${displayClass}`;
+  element.title = health.error || (health.lastChecked ? `Last checked: ${new Date(health.lastChecked).toLocaleTimeString()}` : '');
 }
 
 // Toggle debug panel visibility
