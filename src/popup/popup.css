@@ -60,6 +60,27 @@ header h1 {
   display: block;
 }
 
+.header-btn-danger {
+  padding: 6px;
+  background: #e53935;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.header-btn-danger:hover {
+  background: #c62828;
+}
+
+.header-btn-danger svg {
+  display: block;
+}
+
 .version {
   font-size: 12px;
   color: #fff;

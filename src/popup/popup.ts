@@ -155,6 +155,7 @@ function showSection(
   const hasWallet = section === 'wallet';
   elements.btnCopyDebug.classList.toggle('hidden', !hasWallet);
   elements.btnDebugToggle.classList.toggle('hidden', !hasWallet);
+  elements.btnClearWallet.classList.toggle('hidden', !hasWallet);
   elements.debugPanel.classList.toggle('hidden', !hasWallet || !debugPanelVisible);
 
   switch (section) {
