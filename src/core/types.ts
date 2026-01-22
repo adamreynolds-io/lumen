@@ -25,8 +25,8 @@ export const NETWORKS: Record<Exclude<NetworkId, 'custom'>, NetworkConfig> = {
     id: 'localnet',
     name: 'Localnet',
     nodeUrl: 'http://localhost:9944',
-    indexerUrl: 'http://localhost:8088',
-    indexerWsUrl: 'ws://localhost:8088',
+    indexerUrl: 'http://localhost:8088/api/v3/graphql',
+    indexerWsUrl: 'ws://localhost:8088/api/v3/graphql/ws',
     proverUrl: 'http://localhost:6300',
   },
   devnet: {
@@ -34,7 +34,7 @@ export const NETWORKS: Record<Exclude<NetworkId, 'custom'>, NetworkConfig> = {
     name: 'DevNet',
     nodeUrl: 'wss://rpc.devnet.midnight.network',
     indexerUrl: 'https://indexer.devnet.midnight.network/api/v3/graphql',
-    indexerWsUrl: 'wss://indexer.devnet.midnight.network/api/v3/graphql',
+    indexerWsUrl: 'wss://indexer.devnet.midnight.network/api/v3/graphql/ws',
     proverUrl: 'https://prover.devnet.midnight.network',
   },
   qanet: {
@@ -42,7 +42,7 @@ export const NETWORKS: Record<Exclude<NetworkId, 'custom'>, NetworkConfig> = {
     name: 'QANET',
     nodeUrl: 'wss://rpc.qanet.midnight.network',
     indexerUrl: 'https://indexer.qanet.midnight.network/api/v3/graphql',
-    indexerWsUrl: 'wss://indexer.qanet.midnight.network/api/v3/graphql',
+    indexerWsUrl: 'wss://indexer.qanet.midnight.network/api/v3/graphql/ws',
     proverUrl: 'https://prover.qanet.midnight.network',
   },
   preview: {
@@ -50,7 +50,7 @@ export const NETWORKS: Record<Exclude<NetworkId, 'custom'>, NetworkConfig> = {
     name: 'Preview',
     nodeUrl: 'wss://rpc.preview.midnight.network',
     indexerUrl: 'https://indexer.preview.midnight.network/api/v3/graphql',
-    indexerWsUrl: 'wss://indexer.preview.midnight.network/api/v3/graphql',
+    indexerWsUrl: 'wss://indexer.preview.midnight.network/api/v3/graphql/ws',
     proverUrl: 'https://prover.preview.midnight.network',
   },
   preprod: {
@@ -58,7 +58,7 @@ export const NETWORKS: Record<Exclude<NetworkId, 'custom'>, NetworkConfig> = {
     name: 'PreProd',
     nodeUrl: 'wss://rpc.preprod.midnight.network',
     indexerUrl: 'https://indexer.preprod.midnight.network/api/v3/graphql',
-    indexerWsUrl: 'wss://indexer.preprod.midnight.network/api/v3/graphql',
+    indexerWsUrl: 'wss://indexer.preprod.midnight.network/api/v3/graphql/ws',
     proverUrl: 'https://prover.preprod.midnight.network',
   },
 };
@@ -110,12 +110,12 @@ export class LumenError extends Error {
   }
 }
 
-// Prefunded localnet wallet seeds (for development/testing)
+// Prefunded localnet wallet seeds (genesis mint wallets from testkit-js)
 export const LOCALNET_SEEDS: Record<string, string> = {
   'wallet-0': '0000000000000000000000000000000000000000000000000000000000000001',
   'wallet-1': '0000000000000000000000000000000000000000000000000000000000000002',
   'wallet-2': '0000000000000000000000000000000000000000000000000000000000000003',
-  'wallet-3': 'a51c86de32d0791f7cffc3bdff1abd9bb54987f0ed5effc30c936dddbb9afd9d530c8db445e4f2d3ea42a321b260e022aadf05987c9a67ec7b6b6ca1d0593ec9',
+  'wallet-3': '0000000000000000000000000000000000000000000000000000000000000004',
 };
 
 // dApp connector types (aligned with dapp-connector-api)

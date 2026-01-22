@@ -14,18 +14,26 @@
   },
   "devDependencies": {
     "@types/chrome": "^0.0.268",
+    "assert": "^2.1.0",
+    "buffer": "^6.0.3",
+    "crypto-browserify": "^3.12.1",
     "esbuild": "^0.20.0",
+    "esbuild-plugin-wasm": "^1.1.0",
+    "process": "^0.11.10",
+    "stream-browserify": "^3.0.0",
     "tsx": "^4.7.0",
-    "typescript": "^5.3.0"
+    "typescript": "^5.3.0",
+    "util": "^0.12.5"
   },
   "dependencies": {
     "@midnight-ntwrk/dapp-connector-api": "4.0.0-beta.2",
     "@midnight-ntwrk/wallet-sdk-address-format": "3.0.0-beta.11",
     "@midnight-ntwrk/wallet-sdk-capabilities": "3.0.0-beta.11",
-    "@midnight-ntwrk/wallet-sdk-hd": "3.0.0-beta.8",
     "@midnight-ntwrk/wallet-sdk-dust-wallet": "1.0.0-beta.15",
     "@midnight-ntwrk/wallet-sdk-facade": "1.0.0-beta.16",
+    "@midnight-ntwrk/wallet-sdk-hd": "3.0.0-beta.8",
     "@midnight-ntwrk/wallet-sdk-node-client": "1.0.0-beta.12",
-    "@midnight-ntwrk/wallet-sdk-utilities": "1.0.0-beta.10"
+    "@midnight-ntwrk/wallet-sdk-utilities": "1.0.0-beta.10",
+    "bech32": "^2.0.0"
   }
 }

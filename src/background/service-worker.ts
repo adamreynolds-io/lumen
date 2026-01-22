@@ -31,7 +31,6 @@ import {
 
 import {
   testConnection as networkTestConnection,
-  queryBalance,
   saveNetworkConfig,
   loadNetworkConfig,
   getRpcUrl,
@@ -42,7 +41,23 @@ import {
   type NetworkUrls,
 } from '../core/network.js';
 
+import {
+  LumenFacade,
+  createFacade,
+  createFacadeConfig,
+  type DustBalance,
+} from '../core/facade.js';
+
 console.log('[Lumen] Service worker starting...');
+
+// Log any uncaught errors
+self.addEventListener('error', (event) => {
+  console.error('[Lumen] Uncaught error:', event.error);
+});
+
+self.addEventListener('unhandledrejection', (event) => {
+  console.error('[Lumen] Unhandled rejection:', event.reason);
+});
 
 // ============================================
 // State
@@ -57,6 +72,9 @@ let walletState: WalletState = {
 // In-memory keys (never persisted)
 let currentKeys: WalletKeys | null = null;
 let currentWalletInfo: WalletInfo | null = null;
+
+// Wallet facade for SDK operations (balance queries, etc.)
+let facade: LumenFacade | null = null;
 
 // ============================================
 // Helpers
@@ -76,6 +94,50 @@ function getNetworkId(): string {
   return walletState.network === 'custom'
     ? 'custom'
     : walletState.network;
+}
+
+/**
+ * Initialize or reinitialize the wallet facade.
+ * Called when wallet is loaded or network changes.
+ */
+async function initializeFacade(): Promise<void> {
+  // Stop existing facade if any
+  if (facade) {
+    try {
+      await facade.stop();
+    } catch (e) {
+      console.warn('[Lumen] Failed to stop existing facade:', e);
+    }
+    facade = null;
+  }
+
+  // Need keys to initialize facade
+  if (!currentKeys) {
+    return;
+  }
+
+  // Get network URLs
+  const urls = getNetworkUrls(walletState.network, walletState.customUrls);
+
+  // Create facade config
+  const config = createFacadeConfig(
+    getNetworkId(),
+    urls.nodeUrl,
+    urls.indexerUrl,
+    urls.indexerWsUrl,
+    urls.proverUrl
+  );
+
+  // Create and start facade with the HD-derived dust key (not raw seed)
+  facade = createFacade(config, currentKeys.dustKey);
+
+  try {
+    await facade.start();
+    console.log('[Lumen] Facade initialized and syncing');
+  } catch (e) {
+    console.error('[Lumen] Failed to start facade:', e);
+    facade = null;
+  }
 }
 
 // ============================================
@@ -170,6 +232,7 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
 
   // Import a prefunded localnet wallet
   importLocalnetWallet: (params: { walletName: string }) => {
+    console.log('[Lumen] importLocalnetWallet called with:', params);
     const { walletName } = params;
     const seed = LOCALNET_SEEDS[walletName];
 
@@ -180,10 +243,19 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
       );
     }
 
+    console.log('[Lumen] Found seed for', walletName, '- calling importFromHexSeed');
     const networkId = getNetworkId();
-    const result = importFromHexSeed(seed, networkId);
+
+    let result;
+    try {
+      result = importFromHexSeed(seed, networkId);
+    } catch (e) {
+      console.error('[Lumen] importFromHexSeed threw:', e);
+      throw e;
+    }
 
     if (!result.success) {
+      console.error('[Lumen] importFromHexSeed failed:', result.error);
       throw new LumenError(result.error, 'INVALID_INPUT');
     }
 
@@ -223,7 +295,17 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
   },
 
   // Clear wallet
-  clearWallet: () => {
+  clearWallet: async () => {
+    // Stop facade if running
+    if (facade) {
+      try {
+        await facade.stop();
+      } catch (e) {
+        console.warn('[Lumen] Failed to stop facade:', e);
+      }
+      facade = null;
+    }
+
     currentKeys = null;
     currentWalletInfo = null;
 
@@ -263,10 +345,10 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
     // Persist to storage
     await saveNetworkConfig(params.network, params.customUrls?.nodeUrl);
 
-    // Re-derive address if wallet exists and network changed
-    if (currentKeys && currentWalletInfo && previousNetwork !== params.network) {
-      const networkId = getNetworkId();
-      console.log('[Lumen] Network changed to:', networkId);
+    // Reinitialize facade if wallet exists and network changed
+    if (currentKeys && previousNetwork !== params.network) {
+      console.log('[Lumen] Network changed to:', params.network, '- reinitializing facade');
+      await initializeFacade();
     }
 
     return { success: true, network: params.network };
@@ -299,18 +381,35 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
     return getNetworkUrls(walletState.network, walletState.customUrls);
   },
 
-  // Refresh balance from network
+  // Refresh balance from network using facade
   refreshBalance: async () => {
     requireWallet();
 
-    const rpcUrl = getRpcUrl(walletState.network, walletState.customUrls?.nodeUrl);
-    const balance = await queryBalance(rpcUrl, walletState.address!);
+    // Initialize facade if not already done
+    if (!facade) {
+      await initializeFacade();
+    }
 
-    walletState.balance = balance.total;
+    if (!facade) {
+      console.log('[Lumen] Facade not available, returning 0 balance');
+      return { total: '0', available: '0', pending: '0' };
+    }
 
-    console.log('[Lumen] Balance refreshed:', balance.total);
+    try {
+      const balance = await facade.getBalance();
+      walletState.balance = balance.total.toString();
 
-    return balance;
+      console.log('[Lumen] Balance refreshed via facade:', balance.total.toString());
+
+      return {
+        total: balance.total.toString(),
+        available: balance.available.toString(),
+        pending: balance.pending.toString(),
+      };
+    } catch (e) {
+      console.error('[Lumen] Failed to get balance from facade:', e);
+      return { total: '0', available: '0', pending: '0' };
+    }
   },
 
   // === dApp Connector Methods ===

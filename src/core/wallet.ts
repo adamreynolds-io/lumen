@@ -3,6 +3,7 @@
  *
  * Handles wallet generation, import, key derivation, and signing.
  * Uses @midnight-ntwrk/wallet-sdk-hd for HD wallet operations.
+ * Uses @midnight-ntwrk/wallet-sdk-address-format for Bech32m address encoding.
  */
 
 import {
@@ -15,12 +16,10 @@ import {
   type Role,
 } from '@midnight-ntwrk/wallet-sdk-hd';
 
-import { mnemonicToSeedSync } from '@scure/bip39';
-import { wordlist } from '@scure/bip39/wordlists/english';
+import { DustAddress } from '@midnight-ntwrk/wallet-sdk-address-format';
+import { DustSecretKey } from '@midnight-ntwrk/ledger-v7';
 
-// Note: @midnight-ntwrk/wallet-sdk-address-format has Node.js/WASM dependencies
-// that don't work in browser extension context. Using hex addresses for now.
-// TODO: Implement bech32m encoding manually or wait for browser-compatible SDK
+import { mnemonicToSeedSync } from '@scure/bip39';
 
 // ============================================
 // Types
@@ -29,12 +28,14 @@ import { wordlist } from '@scure/bip39/wordlists/english';
 export interface WalletKeys {
   /** 64-byte seed derived from mnemonic */
   seed: Uint8Array;
-  /** Derived Dust key for gas payments */
+  /** Derived Dust key for gas payments (raw bytes) */
   dustKey: Uint8Array;
   /** Derived Night External key */
   nightExternalKey: Uint8Array;
   /** Derived Night Internal key */
   nightInternalKey: Uint8Array;
+  /** Dust secret key from ledger (for SDK operations) */
+  dustSecretKey: DustSecretKey;
 }
 
 export interface WalletInfo {
@@ -138,6 +139,10 @@ export function deriveKeys(
     };
   }
 
+  // Create DustSecretKey from the HD-derived dust key (not raw seed)
+  // The dustKey is 32 bytes derived via HDWallet -> selectRole(Dust) -> deriveKeyAt(0)
+  const dustSecretKey = DustSecretKey.fromSeed(dustKey);
+
   return {
     success: true,
     data: {
@@ -145,6 +150,7 @@ export function deriveKeys(
       dustKey,
       nightExternalKey,
       nightInternalKey,
+      dustSecretKey,
     },
   };
 }
@@ -163,13 +169,15 @@ export function keyToHex(key: Uint8Array): string {
 }
 
 /**
- * Format a Dust address.
- * Note: Using hex format until browser-compatible bech32m encoding is available.
+ * Format a Dust address using the SDK's Bech32m encoding.
+ * Uses wallet-sdk-address-format for proper Midnight address encoding.
+ *
+ * @param dustSecretKey - The DustSecretKey from ledger
+ * @param networkId - Network identifier (localnet, devnet, etc)
  */
-export function formatDustAddress(dustKey: Uint8Array, networkId: string): string {
-  // Prefix with network for disambiguation
-  const prefix = networkId === 'mainnet' ? 'mn1' : `mn_${networkId.slice(0, 3)}_`;
-  return `${prefix}${keyToHex(dustKey).slice(0, 40)}`;
+export function formatDustAddress(dustSecretKey: DustSecretKey, networkId: string): string {
+  const publicKey = dustSecretKey.publicKey;
+  return DustAddress.encodePublicKey(networkId, publicKey);
 }
 
 /**
@@ -204,8 +212,8 @@ export function createWallet(networkId: string): WalletResult<{
     return keysResult;
   }
 
-  // Format address
-  const address = formatDustAddress(keysResult.data.dustKey, networkId);
+  // Format address using proper Bech32m encoding
+  const address = formatDustAddress(keysResult.data.dustSecretKey, networkId);
   const publicKeyHex = keyToHex(keysResult.data.dustKey);
 
   return {
@@ -254,8 +262,8 @@ export function importFromMnemonic(
     return keysResult;
   }
 
-  // Format address
-  const address = formatDustAddress(keysResult.data.dustKey, networkId);
+  // Format address using proper Bech32m encoding
+  const address = formatDustAddress(keysResult.data.dustSecretKey, networkId);
   const publicKeyHex = keyToHex(keysResult.data.dustKey);
 
   return {
@@ -292,24 +300,20 @@ export function importFromPrivateKey(
     };
   }
 
-  // Convert to bytes (use as seed directly for simplicity)
+  // Convert to bytes (DO NOT pad - use 32 bytes directly like testkit)
   const seed = new Uint8Array(32);
   for (let i = 0; i < 32; i++) {
     seed[i] = parseInt(cleanHex.slice(i * 2, i * 2 + 2), 16);
   }
 
-  // Pad to 64 bytes for HD wallet compatibility
-  const paddedSeed = new Uint8Array(64);
-  paddedSeed.set(seed, 0);
-
   // Derive keys
-  const keysResult = deriveKeys(paddedSeed);
+  const keysResult = deriveKeys(seed);
   if (!keysResult.success) {
     return keysResult;
   }
 
-  // Format address
-  const address = formatDustAddress(keysResult.data.dustKey, networkId);
+  // Format address using proper Bech32m encoding
+  const address = formatDustAddress(keysResult.data.dustSecretKey, networkId);
   const publicKeyHex = keyToHex(keysResult.data.dustKey);
 
   return {
@@ -327,7 +331,7 @@ export function importFromPrivateKey(
 
 /**
  * Import a wallet from a hex seed.
- * Accepts either 64 hex chars (32 bytes, will be padded) or 128 hex chars (64 bytes).
+ * Accepts either 64 hex chars (32 bytes) or 128 hex chars (64 bytes).
  * Used for prefunded localnet wallets.
  */
 export function importFromHexSeed(
@@ -347,20 +351,11 @@ export function importFromHexSeed(
     };
   }
 
-  // Convert to bytes
+  // Convert to bytes (DO NOT pad - testkit uses 32 bytes directly)
   const byteLength = cleanHex.length / 2;
-  const seedBytes = new Uint8Array(byteLength);
+  const seed = new Uint8Array(byteLength);
   for (let i = 0; i < byteLength; i++) {
-    seedBytes[i] = parseInt(cleanHex.slice(i * 2, i * 2 + 2), 16);
-  }
-
-  // Pad to 64 bytes if needed
-  let seed: Uint8Array;
-  if (byteLength === 32) {
-    seed = new Uint8Array(64);
-    seed.set(seedBytes, 0);
-  } else {
-    seed = seedBytes;
+    seed[i] = parseInt(cleanHex.slice(i * 2, i * 2 + 2), 16);
   }
 
   // Derive keys
@@ -369,8 +364,8 @@ export function importFromHexSeed(
     return keysResult;
   }
 
-  // Format address
-  const address = formatDustAddress(keysResult.data.dustKey, networkId);
+  // Format address using proper Bech32m encoding
+  const address = formatDustAddress(keysResult.data.dustSecretKey, networkId);
   const publicKeyHex = keyToHex(keysResult.data.dustKey);
 
   return {
