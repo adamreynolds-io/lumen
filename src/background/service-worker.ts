@@ -24,9 +24,19 @@ import {
   type LumenRequest,
   type LumenResponse,
   type ErrorCode,
-  NETWORKS,
   LumenError,
 } from '../core/types.js';
+
+import {
+  testConnection as networkTestConnection,
+  queryBalance,
+  saveNetworkConfig,
+  loadNetworkConfig,
+  getRpcUrl,
+  getNetworkPresets,
+  isValidRpcUrl,
+  type NetworkStatus,
+} from '../core/network.js';
 
 console.log('[Lumen] Service worker starting...');
 
@@ -163,7 +173,17 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
   },
 
   // Set network
-  setNetwork: (params: { network: NetworkId; customRpcUrl?: string }) => {
+  setNetwork: async (params: { network: NetworkId; customRpcUrl?: string }) => {
+    // Validate custom RPC URL if provided
+    if (params.network === 'custom') {
+      if (!params.customRpcUrl) {
+        throw new LumenError('Custom network requires an RPC URL', 'INVALID_INPUT');
+      }
+      if (!isValidRpcUrl(params.customRpcUrl)) {
+        throw new LumenError('Invalid RPC URL format', 'INVALID_INPUT');
+      }
+    }
+
     const previousNetwork = walletState.network;
     walletState.network = params.network;
 
@@ -171,32 +191,52 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
       walletState.customRpcUrl = params.customRpcUrl;
     }
 
+    // Persist to storage
+    await saveNetworkConfig(params.network, params.customRpcUrl);
+
     // Re-derive address if wallet exists and network changed
     if (currentKeys && currentWalletInfo && previousNetwork !== params.network) {
       const networkId = getNetworkId();
-      // Note: In a full implementation, we'd re-encode the address for the new network
       console.log('[Lumen] Network changed to:', networkId);
     }
 
-    return { success: true };
+    return { success: true, network: params.network };
   },
 
   // Test connection
-  testConnection: async () => {
-    const network = walletState.network;
-    const rpcUrl =
-      network === 'custom'
-        ? walletState.customRpcUrl
-        : NETWORKS[network as keyof typeof NETWORKS]?.rpcUrl;
+  testConnection: async (): Promise<NetworkStatus> => {
+    const rpcUrl = getRpcUrl(walletState.network, walletState.customRpcUrl);
 
-    if (!rpcUrl) {
-      throw new LumenError('No RPC URL configured', 'NETWORK_ERROR');
+    console.log('[Lumen] Testing connection to:', rpcUrl);
+
+    const status = await networkTestConnection(rpcUrl);
+
+    if (status.connected) {
+      console.log('[Lumen] Connected to:', status.chainInfo?.name, 'at block', status.blockHeight);
+    } else {
+      console.log('[Lumen] Connection failed:', status.error);
     }
 
-    // TODO: Implement actual RPC health check
-    console.log('[Lumen] Test connection to:', rpcUrl);
+    return status;
+  },
 
-    return { success: true, rpcUrl };
+  // Get network presets
+  getNetworkPresets: () => {
+    return getNetworkPresets();
+  },
+
+  // Refresh balance from network
+  refreshBalance: async () => {
+    requireWallet();
+
+    const rpcUrl = getRpcUrl(walletState.network, walletState.customRpcUrl);
+    const balance = await queryBalance(rpcUrl, walletState.address!);
+
+    walletState.balance = balance.total;
+
+    console.log('[Lumen] Balance refreshed:', balance.total);
+
+    return balance;
   },
 
   // === dApp Connector Methods ===
@@ -265,15 +305,11 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
 
   // Get network info
   getNetwork: () => {
-    const network = walletState.network;
-    const rpcUrl =
-      network === 'custom'
-        ? walletState.customRpcUrl
-        : NETWORKS[network as keyof typeof NETWORKS]?.rpcUrl;
+    const rpcUrl = getRpcUrl(walletState.network, walletState.customRpcUrl);
 
     return {
       rpcUrl,
-      networkId: network,
+      networkId: walletState.network,
     };
   },
 };
@@ -317,11 +353,33 @@ chrome.runtime.onMessage.addListener((request: LumenRequest, _sender, sendRespon
 });
 
 // ============================================
+// Initialization
+// ============================================
+
+async function initializeState(): Promise<void> {
+  try {
+    // Load saved network configuration
+    const networkConfig = await loadNetworkConfig();
+    walletState.network = networkConfig.networkId;
+    walletState.customRpcUrl = networkConfig.customRpcUrl;
+
+    console.log('[Lumen] Loaded network config:', networkConfig.networkId);
+  } catch (error) {
+    console.error('[Lumen] Failed to load network config:', error);
+  }
+}
+
+// Initialize on startup
+initializeState();
+
+// ============================================
 // Lifecycle
 // ============================================
 
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener(async () => {
   console.log('[Lumen] Extension installed');
+  // Set default network on first install
+  await saveNetworkConfig('devnet');
 });
 
 console.log('[Lumen] Service worker ready');

@@ -55,14 +55,22 @@
 - Address formatting uses hex format with network prefix (mn_dev_, mn_loc_, etc.) - browser-compatible bech32m encoding deferred due to SDK WASM dependencies
 - All 21 unit tests passing in `test/wallet.test.ts`
 
-## Phase 4: Network Layer
+## Phase 4: Network Layer ✅
 
-- [ ] Implement RPC client (src/core/network.ts)
-- [ ] Implement balance query
-- [ ] Implement network configuration storage (chrome.storage)
-- [ ] Add preset network URLs (Localnet, DevNet, QANET, Preview, PreProd)
-- [ ] Implement connection test
-- [ ] Verify RPC calls work from service worker
+- [x] Implement RPC client (src/core/network.ts)
+- [x] Implement balance query
+- [x] Implement network configuration storage (chrome.storage)
+- [x] Add preset network URLs (Localnet, DevNet, QANET, Preview, PreProd)
+- [x] Implement connection test
+- [x] Verify RPC calls work from service worker
+
+**Implementation Notes**:
+- Uses @polkadot/api (same as wallet-sdk-node-client) for RPC communication
+- Connection caching to avoid reconnecting for each request
+- Supports HTTP, HTTPS, WS, and WSS protocols
+- Balance query via Substrate's system.account storage
+- Network config persisted to chrome.storage.local
+- All 17 unit tests passing in `test/network.test.ts`
 
 ## Phase 5: dApp Connector API
 
