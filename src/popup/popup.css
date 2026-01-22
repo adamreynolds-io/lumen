@@ -67,7 +67,7 @@ header h1 {
 
 .version {
   font-size: 12px;
-  color: #666;
+  color: #fff;
 }
 
 /* Scrollable content area */
@@ -86,7 +86,7 @@ header h1 {
 }
 
 .message {
-  color: #888;
+  color: #fff;
   text-align: center;
   padding: 20px 0;
 }
@@ -99,7 +99,7 @@ header h1 {
   display: block;
   font-size: 11px;
   text-transform: uppercase;
-  color: #666;
+  color: #fff;
   margin-bottom: 4px;
 }
 
@@ -176,7 +176,7 @@ button:not(.secondary):not(.danger):not(.icon-btn):not(.debug-tab):hover {
 
 button.secondary {
   background: #2a2a3e;
-  color: #aaa;
+  color: #fff;
   border: 1px solid #444;
 }
 
@@ -223,7 +223,7 @@ button.icon-btn:hover {
 
 .seed-words span::before {
   content: attr(data-index) '. ';
-  color: #666;
+  color: #fff;
 }
 
 .warning {
@@ -296,7 +296,7 @@ button.icon-btn:hover {
   display: block;
   font-size: 11px;
   text-transform: uppercase;
-  color: #666;
+  color: #fff;
   margin-bottom: 8px;
 }
 
@@ -311,7 +311,7 @@ button.icon-btn:hover {
   font-size: 13px;
   background: #1a1a2e;
   border: 1px solid #444;
-  color: #aaa;
+  color: #fff;
 }
 
 .localnet-btn:hover {
@@ -323,7 +323,7 @@ button.icon-btn:hover {
 /* Hint text */
 .hint {
   font-size: 11px;
-  color: #666;
+  color: #fff;
   margin-top: 8px;
 }
 
@@ -383,7 +383,7 @@ button.icon-btn:hover {
   padding: 2px 6px;
   border-radius: 3px;
   background: #2a2a3e;
-  color: #888;
+  color: #fff;
 }
 
 .sync-badge.synced {
@@ -413,14 +413,14 @@ button.icon-btn:hover {
   background: transparent;
   border: 1px solid #2a2a3e;
   border-radius: 4px;
-  color: #666;
+  color: #fff;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .debug-tab:hover {
   background: #2a2a3e;
-  color: #aaa;
+  color: #fff;
 }
 
 .debug-tab.active {
@@ -445,13 +445,13 @@ button.icon-btn:hover {
   align-items: center;
   gap: 4px;
   padding: 20px;
-  color: #555;
+  color: #fff;
   text-align: center;
 }
 
 .placeholder-message .hint {
   font-size: 9px;
-  color: #444;
+  color: #fff;
 }
 
 .debug-section {
@@ -465,7 +465,7 @@ button.icon-btn:hover {
 .debug-label {
   font-size: 10px;
   text-transform: uppercase;
-  color: #555;
+  color: #fff;
   margin-bottom: 6px;
 }
 
@@ -473,11 +473,11 @@ button.icon-btn:hover {
   display: flex;
   justify-content: space-between;
   padding: 2px 0;
-  color: #aaa;
+  color: #fff;
 }
 
 .debug-value .label {
-  color: #666;
+  color: #fff;
 }
 
 /* Sync Progress Bar */
@@ -503,7 +503,7 @@ button.icon-btn:hover {
 
 #sync-status {
   font-size: 10px;
-  color: #888;
+  color: #fff;
 }
 
 #sync-status.synced {
@@ -527,7 +527,7 @@ button.icon-btn:hover {
   display: block;
   padding: 8px;
   text-align: center;
-  color: #555;
+  color: #fff;
 }
 
 /* Expandable Coin Items */
@@ -559,7 +559,7 @@ button.icon-btn:hover {
 
 .coin-value {
   flex: 1;
-  color: #aaa;
+  color: #fff;
   font-weight: 500;
 }
 
@@ -572,7 +572,7 @@ button.icon-btn:hover {
 
 .coin-expand {
   font-size: 8px;
-  color: #555;
+  color: #fff;
   transition: transform 0.2s;
 }
 
@@ -591,7 +591,7 @@ button.icon-btn:hover {
 }
 
 .coin-item.spent .coin-status {
-  color: #666;
+  color: #fff;
   background: rgba(102, 102, 102, 0.15);
 }
 
@@ -612,11 +612,11 @@ button.icon-btn:hover {
   display: flex;
   justify-content: space-between;
   padding: 3px 0;
-  color: #888;
+  color: #fff;
 }
 
 .coin-detail .label {
-  color: #555;
+  color: #fff;
 }
 
 .coin-detail .truncate {
@@ -657,7 +657,7 @@ button.icon-btn:hover {
 }
 
 .status-indicator.unknown {
-  color: #666;
+  color: #fff;
 }
 
 .status-indicator.unknown::before {
@@ -714,7 +714,7 @@ button.icon-btn:hover {
 }
 
 .status-no {
-  color: #666;
+  color: #fff;
 }
 
 /* Transaction History */
@@ -746,7 +746,7 @@ button.icon-btn:hover {
 .tx-type {
   font-weight: 500;
   text-transform: capitalize;
-  color: #aaa;
+  color: #fff;
 }
 
 .tx-status {
@@ -770,7 +770,7 @@ button.icon-btn:hover {
   display: flex;
   justify-content: space-between;
   font-size: 11px;
-  color: #888;
+  color: #fff;
 }
 
 .tx-amount {
@@ -779,6 +779,6 @@ button.icon-btn:hover {
 
 .tx-id {
   font-size: 10px;
-  color: #555;
+  color: #fff;
   margin-top: 4px;
 }
