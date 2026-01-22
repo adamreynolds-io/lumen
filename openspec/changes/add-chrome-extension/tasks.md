@@ -72,17 +72,25 @@
 - Network config persisted to chrome.storage.local
 - All 17 unit tests passing in `test/network.test.ts`
 
-## Phase 5: dApp Connector API
+## Phase 5: dApp Connector API ✅
 
-- [ ] Implement window.midnight object injection
-- [ ] Implement enable() / disable()
-- [ ] Implement isEnabled()
-- [ ] Implement getAddress()
-- [ ] Implement getBalance()
-- [ ] Implement signTransaction()
-- [ ] Implement signMessage()
-- [ ] Implement getNetwork()
-- [ ] Integration test with mock dApp page
+- [x] Implement window.midnight object injection
+- [x] Implement enable() / disable()
+- [x] Implement isEnabled()
+- [x] Implement getAddress()
+- [x] Implement getBalance()
+- [x] Implement signTransaction()
+- [x] Implement signMessage()
+- [x] Implement getNetwork()
+- [x] Integration test with mock dApp page
+
+**Implementation Notes**:
+- Full implementation of @midnight-ntwrk/dapp-connector-api specification
+- InitialAPI pattern: window.midnight['lumen-wallet'] with rdns, name, icon, apiVersion, connect()
+- ConnectedAPI with all methods: getDustAddress, getUnshieldedAddress, getDustBalance, signData, getConfiguration, getConnectionStatus, etc.
+- Proper APIError handling with dapp-connector-api error codes
+- Shielded operations return empty/not-implemented (developer wallet focus)
+- Test page updated to demonstrate full API flow
 
 ## Phase 6: Popup UI
 

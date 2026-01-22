@@ -11,10 +11,11 @@
       background: #1a1a2e;
       color: #eee;
       padding: 20px;
-      max-width: 800px;
+      max-width: 900px;
       margin: 0 auto;
     }
-    h1 { margin-bottom: 20px; }
+    h1 { margin-bottom: 10px; }
+    .subtitle { color: #888; margin-bottom: 20px; }
     h2 { margin: 20px 0 10px; font-size: 16px; color: #888; }
     .status {
       padding: 10px;
@@ -24,6 +25,30 @@
     .status.connected { background: #1a3a2a; color: #4caf50; }
     .status.disconnected { background: #3a1a1a; color: #f44336; }
     .status.pending { background: #3a3a1a; color: #f0ad4e; }
+    .wallet-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+      background: #2a2a3e;
+      border-radius: 4px;
+      margin-bottom: 20px;
+    }
+    .wallet-info img {
+      width: 48px;
+      height: 48px;
+    }
+    .wallet-info .details {
+      flex: 1;
+    }
+    .wallet-info .name {
+      font-size: 18px;
+      font-weight: bold;
+    }
+    .wallet-info .meta {
+      font-size: 12px;
+      color: #888;
+    }
     button {
       padding: 10px 16px;
       margin: 4px;
@@ -36,6 +61,11 @@
     }
     button:hover { opacity: 0.9; }
     button:disabled { opacity: 0.5; cursor: not-allowed; }
+    button.connect-btn {
+      background: linear-gradient(135deg, #e94560, #764ba2);
+      font-size: 16px;
+      padding: 12px 24px;
+    }
     .result {
       background: #2a2a3e;
       padding: 12px;
@@ -45,49 +75,97 @@
       font-size: 13px;
       white-space: pre-wrap;
       word-break: break-all;
+      max-height: 300px;
+      overflow-y: auto;
     }
     .error { color: #f44336; }
     .success { color: #4caf50; }
     .actions { margin: 10px 0; }
-    input {
+    input, select {
       padding: 8px;
       font-size: 14px;
       background: #2a2a3e;
       border: 1px solid #444;
       border-radius: 4px;
       color: #eee;
-      width: 300px;
     }
+    input { width: 300px; }
+    select { width: 150px; }
+    .section {
+      background: #16162a;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+    }
+    .hidden { display: none; }
   </style>
 </head>
 <body>
   <h1>🌙 Lumen dApp Connector Test</h1>
+  <p class="subtitle">Testing @midnight-ntwrk/dapp-connector-api implementation</p>
 
   <div id="status" class="status disconnected">
     Checking for Lumen wallet...
   </div>
 
-  <h2>Connection</h2>
-  <div class="actions">
-    <button id="btn-enable">enable()</button>
-    <button id="btn-disable">disable()</button>
-    <button id="btn-is-enabled">isEnabled()</button>
+  <!-- Wallet detection section -->
+  <div id="wallet-section" class="section hidden">
+    <div class="wallet-info">
+      <img id="wallet-icon" src="" alt="Wallet icon">
+      <div class="details">
+        <div class="name" id="wallet-name">Wallet Name</div>
+        <div class="meta">
+          <span id="wallet-rdns">rdns</span> ·
+          API v<span id="wallet-api-version">0.0.0</span>
+        </div>
+      </div>
+      <button id="btn-connect" class="connect-btn">Connect to DevNet</button>
+    </div>
+
+    <div class="actions">
+      <label>Network: </label>
+      <select id="network-select">
+        <option value="devnet" selected>DevNet</option>
+        <option value="localnet">Localnet</option>
+        <option value="qanet">QANET</option>
+        <option value="preview">Preview</option>
+        <option value="preprod">PreProd</option>
+      </select>
+    </div>
   </div>
 
-  <h2>Wallet Info</h2>
-  <div class="actions">
-    <button id="btn-address">getAddress()</button>
-    <button id="btn-balance">getBalance()</button>
-    <button id="btn-network">getNetwork()</button>
-  </div>
+  <!-- Connected API section -->
+  <div id="connected-section" class="section hidden">
+    <h2>Addresses</h2>
+    <div class="actions">
+      <button id="btn-dust-address">getDustAddress()</button>
+      <button id="btn-unshielded-address">getUnshieldedAddress()</button>
+    </div>
 
-  <h2>Signing</h2>
-  <div class="actions">
-    <input type="text" id="message-input" placeholder="Message to sign" value="Hello, Midnight!">
-    <button id="btn-sign-message">signMessage()</button>
-  </div>
-  <div class="actions">
-    <button id="btn-sign-tx">signTransaction({ test: true })</button>
+    <h2>Balances</h2>
+    <div class="actions">
+      <button id="btn-dust-balance">getDustBalance()</button>
+      <button id="btn-shielded-balances">getShieldedBalances()</button>
+      <button id="btn-unshielded-balances">getUnshieldedBalances()</button>
+    </div>
+
+    <h2>Signing</h2>
+    <div class="actions">
+      <input type="text" id="sign-data-input" placeholder="Data to sign" value="Hello, Midnight!">
+      <select id="sign-encoding">
+        <option value="text">text</option>
+        <option value="hex">hex</option>
+        <option value="base64">base64</option>
+      </select>
+      <button id="btn-sign-data">signData()</button>
+    </div>
+
+    <h2>Configuration</h2>
+    <div class="actions">
+      <button id="btn-configuration">getConfiguration()</button>
+      <button id="btn-connection-status">getConnectionStatus()</button>
+      <button id="btn-tx-history">getTxHistory(0, 10)</button>
+    </div>
   </div>
 
   <h2>Result</h2>
@@ -96,21 +174,30 @@
   <script>
     const statusEl = document.getElementById('status');
     const resultEl = document.getElementById('result');
+    const walletSection = document.getElementById('wallet-section');
+    const connectedSection = document.getElementById('connected-section');
+
+    let connectedAPI = null;
+    let initialAPI = null;
 
     function showResult(label, data, isError = false) {
       const className = isError ? 'error' : 'success';
-      resultEl.innerHTML = `<span class="${className}">${label}:</span>\n${JSON.stringify(data, null, 2)}`;
+      let displayData;
+      try {
+        // Handle BigInt serialization
+        displayData = JSON.stringify(data, (key, value) =>
+          typeof value === 'bigint' ? value.toString() + 'n' : value
+        , 2);
+      } catch (e) {
+        displayData = String(data);
+      }
+      resultEl.innerHTML = `<span class="${className}">${label}:</span>\n${displayData}`;
       console.log(label, data);
     }
 
-    function updateStatus(connected) {
-      if (connected) {
-        statusEl.textContent = '✓ Lumen wallet detected and connected';
-        statusEl.className = 'status connected';
-      } else {
-        statusEl.textContent = '✗ Lumen wallet not connected';
-        statusEl.className = 'status disconnected';
-      }
+    function updateStatus(message, type = 'pending') {
+      statusEl.textContent = message;
+      statusEl.className = `status ${type}`;
     }
 
     async function callMethod(name, fn) {
@@ -120,7 +207,13 @@
         showResult(name, result);
         return result;
       } catch (err) {
-        showResult(`${name} ERROR`, { message: err.message, code: err.code }, true);
+        const errorInfo = {
+          message: err.message,
+          code: err.code,
+          reason: err.reason,
+          type: err.type
+        };
+        showResult(`${name} ERROR`, errorInfo, true);
         throw err;
       }
     }
@@ -128,78 +221,122 @@
     // Wait for Lumen to be ready
     function waitForLumen(timeout = 3000) {
       return new Promise((resolve) => {
-        if (window.midnight) {
-          resolve(window.midnight);
+        // Check if already available
+        if (window.midnight && window.midnight['lumen-wallet']) {
+          resolve(window.midnight['lumen-wallet']);
           return;
         }
 
-        const handler = () => {
+        const handler = (event) => {
           window.removeEventListener('midnight#ready', handler);
-          resolve(window.midnight);
+          if (window.midnight && window.midnight['lumen-wallet']) {
+            resolve(window.midnight['lumen-wallet']);
+          } else {
+            resolve(null);
+          }
         };
         window.addEventListener('midnight#ready', handler);
 
         setTimeout(() => {
           window.removeEventListener('midnight#ready', handler);
-          resolve(window.midnight);
+          if (window.midnight && window.midnight['lumen-wallet']) {
+            resolve(window.midnight['lumen-wallet']);
+          } else {
+            resolve(null);
+          }
         }, timeout);
       });
     }
 
+    function setupConnectedHandlers() {
+      // Address methods
+      document.getElementById('btn-dust-address').onclick = () =>
+        callMethod('getDustAddress()', () => connectedAPI.getDustAddress());
+
+      document.getElementById('btn-unshielded-address').onclick = () =>
+        callMethod('getUnshieldedAddress()', () => connectedAPI.getUnshieldedAddress());
+
+      // Balance methods
+      document.getElementById('btn-dust-balance').onclick = () =>
+        callMethod('getDustBalance()', () => connectedAPI.getDustBalance());
+
+      document.getElementById('btn-shielded-balances').onclick = () =>
+        callMethod('getShieldedBalances()', () => connectedAPI.getShieldedBalances());
+
+      document.getElementById('btn-unshielded-balances').onclick = () =>
+        callMethod('getUnshieldedBalances()', () => connectedAPI.getUnshieldedBalances());
+
+      // Signing
+      document.getElementById('btn-sign-data').onclick = () => {
+        const data = document.getElementById('sign-data-input').value;
+        const encoding = document.getElementById('sign-encoding').value;
+        callMethod('signData()', () => connectedAPI.signData(data, {
+          encoding,
+          keyType: 'unshielded'
+        }));
+      };
+
+      // Configuration
+      document.getElementById('btn-configuration').onclick = () =>
+        callMethod('getConfiguration()', () => connectedAPI.getConfiguration());
+
+      document.getElementById('btn-connection-status').onclick = () =>
+        callMethod('getConnectionStatus()', () => connectedAPI.getConnectionStatus());
+
+      document.getElementById('btn-tx-history').onclick = () =>
+        callMethod('getTxHistory(0, 10)', () => connectedAPI.getTxHistory(0, 10));
+    }
+
     // Initialize
     async function init() {
-      statusEl.textContent = 'Waiting for Lumen wallet...';
-      statusEl.className = 'status pending';
+      updateStatus('Waiting for Lumen wallet...', 'pending');
 
-      const midnight = await waitForLumen();
+      initialAPI = await waitForLumen();
 
-      if (!midnight) {
-        statusEl.textContent = '✗ Lumen wallet not detected. Is the extension installed?';
-        statusEl.className = 'status disconnected';
+      if (!initialAPI) {
+        updateStatus('✗ Lumen wallet not detected. Is the extension installed?', 'disconnected');
         return;
       }
 
-      statusEl.textContent = `✓ Lumen wallet detected (isLumen: ${midnight.isLumen})`;
-      statusEl.className = 'status connected';
+      // Show wallet info
+      document.getElementById('wallet-icon').src = initialAPI.icon;
+      document.getElementById('wallet-name').textContent = initialAPI.name;
+      document.getElementById('wallet-rdns').textContent = initialAPI.rdns;
+      document.getElementById('wallet-api-version').textContent = initialAPI.apiVersion;
 
-      // Check if already enabled
-      try {
-        const enabled = await midnight.isEnabled();
-        updateStatus(enabled);
-      } catch (e) {
-        console.log('isEnabled check failed:', e);
-      }
+      walletSection.classList.remove('hidden');
+      updateStatus(`✓ ${initialAPI.name} wallet detected`, 'connected');
 
-      // Button handlers
-      document.getElementById('btn-enable').onclick = async () => {
-        const result = await callMethod('enable()', () => midnight.enable());
-        updateStatus(result?.enabled);
+      // Update connect button text based on network selection
+      const networkSelect = document.getElementById('network-select');
+      const connectBtn = document.getElementById('btn-connect');
+
+      networkSelect.onchange = () => {
+        connectBtn.textContent = `Connect to ${networkSelect.options[networkSelect.selectedIndex].text}`;
       };
 
-      document.getElementById('btn-disable').onclick = () =>
-        callMethod('disable()', () => midnight.disable());
+      // Connect button handler
+      connectBtn.onclick = async () => {
+        const networkId = networkSelect.value;
+        connectBtn.disabled = true;
+        connectBtn.textContent = 'Connecting...';
 
-      document.getElementById('btn-is-enabled').onclick = async () => {
-        const enabled = await callMethod('isEnabled()', () => midnight.isEnabled());
-        updateStatus(enabled);
+        try {
+          connectedAPI = await callMethod(`connect('${networkId}')`, () =>
+            initialAPI.connect(networkId)
+          );
+
+          connectedSection.classList.remove('hidden');
+          connectBtn.textContent = `Connected to ${networkSelect.options[networkSelect.selectedIndex].text}`;
+          updateStatus(`✓ Connected to ${networkId}`, 'connected');
+
+          setupConnectedHandlers();
+        } catch (err) {
+          connectBtn.disabled = false;
+          connectBtn.textContent = `Connect to ${networkSelect.options[networkSelect.selectedIndex].text}`;
+          updateStatus(`✗ Connection failed: ${err.message}`, 'disconnected');
+        }
       };
-
-      document.getElementById('btn-address').onclick = () =>
-        callMethod('getAddress()', () => midnight.getAddress());
-
-      document.getElementById('btn-balance').onclick = () =>
-        callMethod('getBalance()', () => midnight.getBalance());
-
-      document.getElementById('btn-network').onclick = () =>
-        callMethod('getNetwork()', () => midnight.getNetwork());
-
-      document.getElementById('btn-sign-message').onclick = () => {
-        const message = document.getElementById('message-input').value;
-        callMethod('signMessage()', () => midnight.signMessage(message));
-      };
-
-      document.getElementById('btn-sign-tx').onclick = () =>
-        callMethod('signTransaction()', () => midnight.signTransaction({ test: true, amount: 100 }));
     }
 
     init();

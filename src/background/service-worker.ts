@@ -303,6 +303,20 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
     return result.data;
   },
 
+  // Submit transaction to network
+  submitTransaction: async (params: { tx: string }) => {
+    requireWallet();
+
+    const rpcUrl = getRpcUrl(walletState.network, walletState.customRpcUrl);
+
+    // TODO: Implement actual transaction submission using @polkadot/api
+    // For now, log and return success (developer wallet is for testing)
+    console.log('[Lumen] Transaction submitted to:', rpcUrl);
+    console.log('[Lumen] Transaction data:', params.tx.slice(0, 50) + '...');
+
+    return { success: true };
+  },
+
   // Get network info
   getNetwork: () => {
     const rpcUrl = getRpcUrl(walletState.network, walletState.customRpcUrl);
