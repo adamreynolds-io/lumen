@@ -1,16 +1,24 @@
 import * as esbuild from 'esbuild';
-import { copyFileSync, mkdirSync } from 'fs';
+import { copyFileSync, cpSync, mkdirSync } from 'fs';
 
 const watch = process.argv.includes('--watch');
 
-// Ensure dist directory exists and copy manifest
+// Ensure dist directories exist
 mkdirSync('dist', { recursive: true });
+mkdirSync('dist/popup', { recursive: true });
+
+// Copy static files
 copyFileSync('src/manifest.json', 'dist/manifest.json');
-console.log('Copied manifest.json to dist/');
+copyFileSync('src/popup/popup.html', 'dist/popup/popup.html');
+copyFileSync('src/popup/popup.css', 'dist/popup/popup.css');
+console.log('Copied static files to dist/');
 
 const buildOptions = {
   entryPoints: {
     'background': 'src/background/service-worker.ts',
+    'content': 'src/content/content.ts',
+    'inject': 'src/inject/inject.ts',
+    'popup/popup': 'src/popup/popup.ts',
   },
   bundle: true,
   outdir: 'dist',

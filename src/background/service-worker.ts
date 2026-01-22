@@ -1,8 +1,11 @@
 /**
- * Phase 0: SDK Compatibility Spike
+ * Service Worker (Background Script)
  *
- * This service worker tests whether @midnight-ntwrk/wallet-sdk-hd
- * works in a Chrome extension service worker context (no DOM).
+ * The source of truth for wallet state. Handles:
+ * - Wallet generation and import
+ * - Key storage (in-memory only)
+ * - Transaction signing
+ * - Network communication
  */
 
 import {
@@ -14,220 +17,270 @@ import {
   Roles,
 } from '@midnight-ntwrk/wallet-sdk-hd';
 
+import {
+  type WalletState,
+  type NetworkId,
+  type LumenRequest,
+  type LumenResponse,
+  type ErrorCode,
+  NETWORKS,
+  LumenError,
+} from '../core/types.js';
+
 console.log('[Lumen] Service worker starting...');
 
-interface SpikeResult {
-  test: string;
-  passed: boolean;
-  details: string;
-  error?: unknown;
+// In-memory wallet state (cleared on restart)
+let walletState: WalletState = {
+  hasWallet: false,
+  network: 'devnet',
+};
+
+// In-memory seed (never persisted)
+let currentSeed: Uint8Array | null = null;
+
+// Helper: Create error response
+function errorResponse(message: string, code: ErrorCode): LumenResponse {
+  return { error: message, errorCode: code };
 }
 
-const results: SpikeResult[] = [];
-
-function logResult(result: SpikeResult): void {
-  results.push(result);
-  const status = result.passed ? '✓ PASS' : '✗ FAIL';
-  console.log(`[Lumen] ${status}: ${result.test}`);
-  console.log(`[Lumen]   ${result.details}`);
-  if (result.error) {
-    console.error('[Lumen]   Error:', result.error);
+// Helper: Require wallet loaded
+function requireWallet(): void {
+  if (!walletState.hasWallet || !currentSeed) {
+    throw new LumenError('No wallet loaded', 'NO_WALLET');
   }
 }
 
-// Test 1: Can we generate mnemonic words?
-function testMnemonicGeneration(): SpikeResult {
-  console.log('[Lumen] Test 1: Generating mnemonic words...');
-  try {
+// Helper: Derive address from seed
+function deriveAddress(seed: Uint8Array): string {
+  const walletResult = HDWallet.fromSeed(seed);
+  if (walletResult.type !== 'seedOk') {
+    throw new LumenError('Failed to derive wallet', 'UNKNOWN_ERROR');
+  }
+
+  // Derive the Dust key for the address (account 0, index 0)
+  const dustKey = walletResult.hdWallet
+    .selectAccount(0)
+    .selectRole(Roles.Dust)
+    .deriveKeyAt(0);
+
+  if (dustKey.type !== 'keyDerived') {
+    throw new LumenError('Failed to derive address key', 'UNKNOWN_ERROR');
+  }
+
+  // Convert key to hex address (simplified - real implementation would use address-format)
+  const hexAddress = Array.from(dustKey.key)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+
+  return `0x${hexAddress.slice(0, 40)}`; // Truncate for display
+}
+
+// Message handlers
+const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown> = {
+  // Get current wallet state
+  getState: () => {
+    return {
+      hasWallet: walletState.hasWallet,
+      address: walletState.address,
+      balance: walletState.balance,
+      network: walletState.network,
+    };
+  },
+
+  // Generate new wallet
+  generateWallet: () => {
     const words = generateMnemonicWords();
-    const wordCount = words.length;
-    const isValid = validateMnemonic(joinMnemonicWords(words));
-
-    return {
-      test: 'Mnemonic Generation',
-      passed: wordCount === 24 && isValid,
-      details: `Generated ${wordCount} words, valid=${isValid}`,
-    };
-  } catch (error) {
-    return {
-      test: 'Mnemonic Generation',
-      passed: false,
-      details: 'Failed to generate mnemonic',
-      error,
-    };
-  }
-}
-
-// Test 2: Can we generate a random seed?
-function testSeedGeneration(): SpikeResult {
-  console.log('[Lumen] Test 2: Generating random seed...');
-  try {
     const seed = generateRandomSeed();
-    const seedLength = seed.length;
 
-    return {
-      test: 'Seed Generation',
-      passed: seedLength > 0,
-      details: `Generated seed of ${seedLength} bytes`,
-    };
-  } catch (error) {
-    return {
-      test: 'Seed Generation',
-      passed: false,
-      details: 'Failed to generate seed',
-      error,
-    };
-  }
-}
+    currentSeed = seed;
+    walletState.hasWallet = true;
+    walletState.address = deriveAddress(seed);
+    walletState.balance = '0';
 
-// Test 3: Can we create HD wallet from seed?
-function testHDWalletCreation(): SpikeResult {
-  console.log('[Lumen] Test 3: Creating HD wallet from seed...');
-  try {
-    const seed = generateRandomSeed();
-    const walletResult = HDWallet.fromSeed(seed);
+    return { seedPhrase: words };
+  },
 
-    if (walletResult.type === 'seedOk') {
-      return {
-        test: 'HD Wallet Creation',
-        passed: true,
-        details: 'HDWallet created successfully from seed',
-      };
-    } else {
-      return {
-        test: 'HD Wallet Creation',
-        passed: false,
-        details: `HDWallet creation failed: ${walletResult.type}`,
-        error: walletResult.error,
-      };
-    }
-  } catch (error) {
-    return {
-      test: 'HD Wallet Creation',
-      passed: false,
-      details: 'Exception during HD wallet creation',
-      error,
-    };
-  }
-}
+  // Import from seed phrase
+  importFromSeed: (params: { seedPhrase: string }) => {
+    const { seedPhrase } = params;
 
-// Test 4: Can we derive keys for different roles?
-function testKeyDerivation(): SpikeResult {
-  console.log('[Lumen] Test 4: Deriving keys for all roles...');
-  try {
-    const seed = generateRandomSeed();
-    const walletResult = HDWallet.fromSeed(seed);
-
-    if (walletResult.type !== 'seedOk') {
-      return {
-        test: 'Key Derivation',
-        passed: false,
-        details: 'Could not create wallet for key derivation test',
-      };
+    if (!validateMnemonic(seedPhrase)) {
+      throw new LumenError('Invalid seed phrase', 'INVALID_INPUT');
     }
 
-    const wallet = walletResult.hdWallet;
-    const account = wallet.selectAccount(0);
-    const derivedKeys: string[] = [];
+    // Generate seed from mnemonic (simplified - real would use proper BIP39)
+    const seed = generateRandomSeed(); // TODO: Properly derive from mnemonic
 
-    // Test all roles
-    const roleTests = [
-      { name: 'Dust', role: Roles.Dust },
-      { name: 'NightExternal', role: Roles.NightExternal },
-      { name: 'NightInternal', role: Roles.NightInternal },
-      { name: 'Zswap', role: Roles.Zswap },
-      { name: 'Metadata', role: Roles.Metadata },
-    ];
+    currentSeed = seed;
+    walletState.hasWallet = true;
+    walletState.address = deriveAddress(seed);
+    walletState.balance = '0';
 
-    for (const { name, role } of roleTests) {
-      const roleKey = account.selectRole(role);
-      const keyResult = roleKey.deriveKeyAt(0);
+    return { success: true };
+  },
 
-      if (keyResult.type === 'keyDerived') {
-        derivedKeys.push(`${name}(${keyResult.key.length}b)`);
-      } else {
-        return {
-          test: 'Key Derivation',
-          passed: false,
-          details: `Failed to derive ${name} key: ${keyResult.type}`,
-        };
-      }
+  // Import from private key
+  importFromKey: (params: { privateKey: string }) => {
+    const { privateKey } = params;
+
+    // Validate hex format
+    const cleanKey = privateKey.replace(/^0x/, '');
+    if (!/^[0-9a-fA-F]{64}$/.test(cleanKey)) {
+      throw new LumenError('Invalid private key format', 'INVALID_INPUT');
     }
 
-    return {
-      test: 'Key Derivation',
-      passed: derivedKeys.length === 5,
-      details: `Derived keys: ${derivedKeys.join(', ')}`,
-    };
-  } catch (error) {
-    return {
-      test: 'Key Derivation',
-      passed: false,
-      details: 'Exception during key derivation',
-      error,
-    };
-  }
-}
+    // Convert hex to bytes
+    const seed = new Uint8Array(32);
+    for (let i = 0; i < 32; i++) {
+      seed[i] = parseInt(cleanKey.slice(i * 2, i * 2 + 2), 16);
+    }
 
-// Test 5: Validate known mnemonic
-function testMnemonicValidation(): SpikeResult {
-  console.log('[Lumen] Test 5: Validating mnemonic...');
+    currentSeed = seed;
+    walletState.hasWallet = true;
+    walletState.address = deriveAddress(seed);
+    walletState.balance = '0';
+
+    return { success: true };
+  },
+
+  // Clear wallet
+  clearWallet: () => {
+    currentSeed = null;
+    walletState = {
+      hasWallet: false,
+      network: walletState.network,
+    };
+    return { success: true };
+  },
+
+  // Set network
+  setNetwork: (params: { network: NetworkId; customRpcUrl?: string }) => {
+    walletState.network = params.network;
+    if (params.network === 'custom' && params.customRpcUrl) {
+      walletState.customRpcUrl = params.customRpcUrl;
+    }
+    return { success: true };
+  },
+
+  // Test connection
+  testConnection: async () => {
+    const network = walletState.network;
+    const rpcUrl =
+      network === 'custom'
+        ? walletState.customRpcUrl
+        : NETWORKS[network as keyof typeof NETWORKS]?.rpcUrl;
+
+    if (!rpcUrl) {
+      throw new LumenError('No RPC URL configured', 'NETWORK_ERROR');
+    }
+
+    // TODO: Implement actual RPC health check
+    return { success: true, rpcUrl };
+  },
+
+  // === dApp Connector Methods ===
+
+  // Enable connection
+  enable: () => {
+    requireWallet();
+    return {
+      enabled: true,
+      address: walletState.address,
+    };
+  },
+
+  // Disable connection
+  disable: () => {
+    return { success: true };
+  },
+
+  // Check if enabled
+  isEnabled: () => {
+    return walletState.hasWallet;
+  },
+
+  // Get address
+  getAddress: () => {
+    requireWallet();
+    return walletState.address;
+  },
+
+  // Get balance
+  getBalance: () => {
+    requireWallet();
+    // TODO: Fetch actual balance from network
+    return walletState.balance ?? '0';
+  },
+
+  // Sign transaction
+  signTransaction: (params: { tx: unknown }) => {
+    requireWallet();
+    // TODO: Implement actual transaction signing
+    console.log('[Lumen] Sign transaction:', params.tx);
+    return { signedTx: 'TODO_SIGNED_TX' };
+  },
+
+  // Sign message
+  signMessage: (params: { message: string }) => {
+    requireWallet();
+    // TODO: Implement actual message signing
+    console.log('[Lumen] Sign message:', params.message);
+    return { signature: 'TODO_SIGNATURE' };
+  },
+
+  // Get network info
+  getNetwork: () => {
+    const network = walletState.network;
+    const rpcUrl =
+      network === 'custom'
+        ? walletState.customRpcUrl
+        : NETWORKS[network as keyof typeof NETWORKS]?.rpcUrl;
+
+    return {
+      rpcUrl,
+      networkId: network,
+    };
+  },
+};
+
+// Message listener
+chrome.runtime.onMessage.addListener((request: LumenRequest, _sender, sendResponse) => {
+  const { method, params } = request;
+  console.log('[Lumen] Received message:', method, params);
+
+  const handler = handlers[method];
+  if (!handler) {
+    sendResponse(errorResponse(`Unknown method: ${method}`, 'UNKNOWN_ERROR'));
+    return true;
+  }
+
   try {
-    // Generate and validate
-    const words = generateMnemonicWords();
-    const mnemonic = joinMnemonicWords(words);
-    const isValid = validateMnemonic(mnemonic);
+    const result = handler(params as never);
 
-    // Test invalid mnemonic
-    const invalidMnemonic = 'invalid words that are not a real mnemonic phrase';
-    const isInvalid = !validateMnemonic(invalidMnemonic);
+    // Handle async handlers
+    if (result instanceof Promise) {
+      result
+        .then((res) => sendResponse({ result: res }))
+        .catch((err: Error) => {
+          const code = err instanceof LumenError ? err.code : 'UNKNOWN_ERROR';
+          sendResponse(errorResponse(err.message, code));
+        });
+      return true; // Keep channel open for async
+    }
 
-    return {
-      test: 'Mnemonic Validation',
-      passed: isValid && isInvalid,
-      details: `Valid mnemonic accepted=${isValid}, invalid rejected=${isInvalid}`,
-    };
-  } catch (error) {
-    return {
-      test: 'Mnemonic Validation',
-      passed: false,
-      details: 'Exception during validation',
-      error,
-    };
+    sendResponse({ result });
+  } catch (err) {
+    const error = err as Error;
+    const code = error instanceof LumenError ? error.code : 'UNKNOWN_ERROR';
+    sendResponse(errorResponse(error.message, code));
   }
-}
 
-// Run all tests
-function runSpike(): void {
-  console.log('[Lumen] ========================================');
-  console.log('[Lumen] Phase 0: SDK Compatibility Spike');
-  console.log('[Lumen] Environment: Chrome Extension Service Worker');
-  console.log('[Lumen] ========================================');
-
-  logResult(testMnemonicGeneration());
-  logResult(testSeedGeneration());
-  logResult(testHDWalletCreation());
-  logResult(testKeyDerivation());
-  logResult(testMnemonicValidation());
-
-  console.log('[Lumen] ========================================');
-  const passed = results.filter((r) => r.passed).length;
-  const total = results.length;
-  console.log(`[Lumen] Results: ${passed}/${total} tests passed`);
-
-  if (passed === total) {
-    console.log('[Lumen] GO: SDK is compatible with service worker context');
-  } else {
-    console.log('[Lumen] NO-GO: SDK has compatibility issues');
-  }
-  console.log('[Lumen] ========================================');
-}
-
-// Run on service worker activation
-chrome.runtime.onInstalled.addListener(() => {
-  console.log('[Lumen] Extension installed');
-  runSpike();
+  return true;
 });
 
-// Also run immediately for reloads
-runSpike();
+// Log on install
+chrome.runtime.onInstalled.addListener(() => {
+  console.log('[Lumen] Extension installed');
+});
+
+console.log('[Lumen] Service worker ready');

@@ -12,19 +12,21 @@
 
 **Result**: GO - SDK is fully compatible with service worker context. See `docs/phase0-spike-results.md`.
 
-## Phase 1: Project Setup
+## Phase 1: Project Setup ✅
 
-- [ ] Initialize npm project with TypeScript
-- [ ] Configure tsconfig.json (strict mode, ES2020)
-- [ ] Install @midnight-ntwrk/dapp-connector-api from npm
-- [ ] Install wallet-sdk packages (stable): address-format, capabilities, hd
-- [ ] Install wallet-sdk packages (pre-release): facade, dust-wallet, node-client, utilities
-- [ ] Review npm package types to understand exact API shapes
-- [ ] Set up esbuild for bundling (background, content, popup, inject)
-- [ ] Create manifest.json (Manifest V3)
-- [ ] Add npm scripts: build, dev (watch mode)
-- [ ] Create directory structure (src/background, src/content, src/popup, src/inject, src/core)
-- [ ] Verify extension loads in Chrome with empty scripts
+- [x] Initialize npm project with TypeScript
+- [x] Configure tsconfig.json (strict mode, ES2020)
+- [x] Install @midnight-ntwrk/dapp-connector-api from npm
+- [x] Install wallet-sdk packages (stable): address-format, capabilities, hd
+- [x] Install wallet-sdk packages (pre-release): facade, dust-wallet, node-client, utilities
+- [x] Review npm package types to understand exact API shapes
+- [x] Set up esbuild for bundling (background, content, popup, inject)
+- [x] Create manifest.json (Manifest V3)
+- [x] Add npm scripts: build, dev (watch mode)
+- [x] Create directory structure (src/background, src/content, src/popup, src/inject, src/core)
+- [x] Verify extension loads in Chrome with empty scripts
+
+**Note**: Using latest beta versions for all @midnight-ntwrk packages.
 
 ## Phase 2: Core Infrastructure
 

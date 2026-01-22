@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lumen Wallet</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Lumen</h1>
+      <span class="version">v0.1.0</span>
+    </header>
+
+    <!-- No Wallet State -->
+    <div id="no-wallet" class="section">
+      <p class="message">No wallet loaded</p>
+      <div class="actions">
+        <button id="btn-generate">Generate New Wallet</button>
+        <button id="btn-import-seed" class="secondary">Import Seed Phrase</button>
+        <button id="btn-import-key" class="secondary">Import Private Key</button>
+      </div>
+    </div>
+
+    <!-- Wallet Loaded State -->
+    <div id="wallet-loaded" class="section hidden">
+      <div class="wallet-info">
+        <label>Address</label>
+        <div class="address-row">
+          <code id="wallet-address">-</code>
+          <button id="btn-copy" class="icon-btn" title="Copy">📋</button>
+        </div>
+      </div>
+      <div class="wallet-info">
+        <label>DUST Balance</label>
+        <div id="wallet-balance">-</div>
+      </div>
+      <div class="wallet-info">
+        <label>Network</label>
+        <select id="network-select">
+          <option value="localnet">Localnet</option>
+          <option value="devnet" selected>DevNet</option>
+          <option value="qanet">QANET</option>
+          <option value="preview">Preview</option>
+          <option value="preprod">PreProd</option>
+          <option value="custom">Custom</option>
+        </select>
+      </div>
+      <div id="custom-rpc" class="wallet-info hidden">
+        <label>Custom RPC URL</label>
+        <input type="text" id="rpc-url" placeholder="https://...">
+      </div>
+      <div class="actions">
+        <button id="btn-test-connection" class="secondary">Test Connection</button>
+        <button id="btn-clear-wallet" class="danger">Clear Wallet</button>
+      </div>
+    </div>
+
+    <!-- Seed Phrase Display (after generation) -->
+    <div id="seed-display" class="section hidden">
+      <p class="warning">⚠️ Write down these words and keep them safe!</p>
+      <div id="seed-words" class="seed-words"></div>
+      <div class="actions">
+        <button id="btn-copy-seed" class="secondary">📋 Copy Seed Phrase</button>
+        <button id="btn-confirm-seed">I've Saved My Seed Phrase</button>
+      </div>
+    </div>
+
+    <!-- Import Seed Phrase -->
+    <div id="import-seed" class="section hidden">
+      <label>Enter Seed Phrase (12 or 24 words)</label>
+      <textarea id="seed-input" rows="3" placeholder="word1 word2 word3..."></textarea>
+      <div class="actions">
+        <button id="btn-do-import-seed">Import</button>
+        <button id="btn-cancel-import" class="secondary">Cancel</button>
+      </div>
+    </div>
+
+    <!-- Import Private Key -->
+    <div id="import-key" class="section hidden">
+      <label>Enter Private Key (hex)</label>
+      <input type="password" id="key-input" placeholder="0x...">
+      <div class="actions">
+        <button id="btn-do-import-key">Import</button>
+        <button id="btn-cancel-import-key" class="secondary">Cancel</button>
+      </div>
+    </div>
+
+    <!-- Status Messages -->
+    <div id="status" class="status hidden"></div>
+  </div>
+
+  <script src="popup.js" type="module"></script>
+</body>
+</html>
