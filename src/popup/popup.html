@@ -90,45 +90,79 @@
     <div id="debug-panel" class="debug-panel hidden">
       <div class="debug-header">
         <span>Debug Info</span>
+        <span id="debug-sync-badge" class="sync-badge">-</span>
       </div>
+
+      <!-- Wallet Type Tabs -->
+      <div class="debug-tabs">
+        <button class="debug-tab active" data-tab="dust">Dust</button>
+        <button class="debug-tab" data-tab="shielded">Shielded</button>
+        <button class="debug-tab" data-tab="unshielded">Unshielded</button>
+      </div>
+
       <div class="debug-content">
-        <!-- Sync Progress -->
-        <div class="debug-section">
-          <div class="debug-label">Sync Progress</div>
-          <div class="debug-sync">
-            <div class="sync-bar">
-              <div id="sync-progress-bar" class="sync-progress" style="width: 0%"></div>
+        <!-- Dust Tab -->
+        <div id="tab-dust" class="tab-content active">
+          <!-- Sync Progress -->
+          <div class="debug-section">
+            <div class="debug-label">Sync Progress</div>
+            <div class="debug-sync">
+              <div class="sync-bar">
+                <div id="sync-progress-bar" class="sync-progress" style="width: 0%"></div>
+              </div>
+              <span id="sync-status">Not started</span>
             </div>
-            <span id="sync-status">Not started</span>
+          </div>
+
+          <!-- Balance Breakdown -->
+          <div class="debug-section">
+            <div class="debug-label">Balance</div>
+            <div class="debug-value">
+              <span class="label">Total:</span>
+              <span id="debug-balance-total">-</span>
+            </div>
+            <div class="debug-value">
+              <span class="label">Available:</span>
+              <span id="debug-balance-available">-</span>
+            </div>
+            <div class="debug-value">
+              <span class="label">Pending:</span>
+              <span id="debug-balance-pending">-</span>
+            </div>
+          </div>
+
+          <!-- Coins -->
+          <div class="debug-section">
+            <div class="debug-label">Coins (<span id="debug-coin-count">0</span>)</div>
+            <div id="debug-coin-list" class="debug-coin-list">
+              <span class="empty">No coins</span>
+            </div>
           </div>
         </div>
 
-        <!-- Balance Breakdown -->
-        <div class="debug-section">
-          <div class="debug-label">Balance Breakdown</div>
-          <div class="debug-value">
-            <span class="label">Total:</span>
-            <span id="debug-balance-total">-</span>
-          </div>
-          <div class="debug-value">
-            <span class="label">Available:</span>
-            <span id="debug-balance-available">-</span>
-          </div>
-          <div class="debug-value">
-            <span class="label">Pending:</span>
-            <span id="debug-balance-pending">-</span>
+        <!-- Shielded Tab -->
+        <div id="tab-shielded" class="tab-content">
+          <div class="debug-section">
+            <div class="debug-label">Shielded Wallet</div>
+            <div class="placeholder-message">
+              <span>Not available</span>
+              <span class="hint">Full WalletFacade required (Phase 2)</span>
+            </div>
           </div>
         </div>
 
-        <!-- Coins -->
-        <div class="debug-section">
-          <div class="debug-label">Coins (<span id="debug-coin-count">0</span>)</div>
-          <div id="debug-coin-list" class="debug-coin-list">
-            <span class="empty">No coins</span>
+        <!-- Unshielded Tab -->
+        <div id="tab-unshielded" class="tab-content">
+          <div class="debug-section">
+            <div class="debug-label">Unshielded Wallet</div>
+            <div class="placeholder-message">
+              <span>Not available</span>
+              <span class="hint">Full WalletFacade required (Phase 2)</span>
+            </div>
           </div>
         </div>
 
-        <!-- Connection Status -->
+        <!-- Connection Status (always visible) -->
         <div class="debug-section">
           <div class="debug-label">Connection</div>
           <div class="debug-value">
@@ -143,7 +177,7 @@
 
         <!-- Copy Debug Info -->
         <div class="debug-actions">
-          <button id="btn-copy-debug" class="secondary">Copy Debug Info</button>
+          <button id="btn-copy-debug" class="secondary">Export Full State</button>
         </div>
       </div>
     </div>

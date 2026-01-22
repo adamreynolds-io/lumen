@@ -53,6 +53,7 @@ const elements = {
   debugPanel: document.getElementById('debug-panel')!,
   btnDebugToggle: document.getElementById('btn-debug-toggle')!,
   btnCopyDebug: document.getElementById('btn-copy-debug')!,
+  debugSyncBadge: document.getElementById('debug-sync-badge')!,
   syncProgressBar: document.getElementById('sync-progress-bar')!,
   syncStatus: document.getElementById('sync-status')!,
   debugBalanceTotal: document.getElementById('debug-balance-total')!,
@@ -62,6 +63,8 @@ const elements = {
   debugCoinList: document.getElementById('debug-coin-list')!,
   debugIndexerStatus: document.getElementById('debug-indexer-status')!,
   debugNodeStatus: document.getElementById('debug-node-status')!,
+  debugTabs: document.querySelectorAll('.debug-tab'),
+  tabContents: document.querySelectorAll('.tab-content'),
 };
 
 // State
@@ -69,6 +72,9 @@ let currentSeedPhrase: string[] | null = null;
 let debugPanelVisible = false;
 let debugPollingInterval: ReturnType<typeof setInterval> | null = null;
 const DEBUG_POLL_INTERVAL_MS = 1000;
+
+// Track expanded coin indices to preserve state across refreshes
+const expandedCoinIndices = new Set<number>();
 
 // Helper: Send message to service worker
 function sendMessage(method: string, params?: unknown): Promise<unknown> {
@@ -419,26 +425,42 @@ chrome.runtime.onMessage.addListener((message) => {
 // Debug Panel
 // ============================================
 
-interface DebugState {
-  facadeStarted: boolean;
-  syncProgress: {
-    percentage: number;
-    currentBlock: number;
-    targetBlock: number;
-    isComplete: boolean;
-  } | null;
-  balance: {
-    total: bigint;
-    available: bigint;
-    pending: bigint;
-  } | null;
-  coinCount: number;
-  facadeStartTime: string | null;
+interface SyncProgress {
+  percentage: number;
+  appliedIndex: number;
+  highestIndex: number;
+  highestRelevantIndex: number;
+  isComplete: boolean;
+}
+
+interface DustGenerationInfo {
+  generationTime: string | null;
+  maxCapacity: string;
+  maxCapReachedAt: string;
+  currentlyGenerated: string;
+  rate: string;
 }
 
 interface CoinInfo {
   value: string;
   status: 'spendable' | 'pending' | 'spent';
+  createdAt: string | null;
+  sequenceNumber: number | null;
+  merkleTreeIndex: string | null;
+  backingNightNonce: string | null;
+  generation: DustGenerationInfo | null;
+}
+
+interface DebugState {
+  facadeStarted: boolean;
+  syncProgress: SyncProgress | null;
+  balance: {
+    total: string;
+    available: string;
+    pending: string;
+  } | null;
+  coinCount: number;
+  facadeStartTime: string | null;
 }
 
 interface ConnectionStatus {
@@ -455,48 +477,165 @@ function formatNumber(value: string): string {
 // Update debug panel with current state
 async function updateDebugPanel(): Promise<void> {
   try {
-    // Use simple getState which we know works
-    const state = await sendMessage('getState') as { hasWallet: boolean; address?: string; balance?: string; network?: string };
+    // Try to get detailed debug state first
+    let debugState: DebugState | null = null;
+    let coins: CoinInfo[] = [];
+    let connectionStatus: ConnectionStatus | null = null;
 
-    // Update sync status based on whether we have balance
-    if (state.hasWallet) {
-      if (state.balance && state.balance !== '0' && state.balance !== 'Loading...') {
-        elements.syncProgressBar.style.width = '100%';
-        elements.syncStatus.textContent = 'Synced';
-        elements.syncStatus.className = 'synced';
-      } else {
-        elements.syncProgressBar.style.width = '50%';
-        elements.syncStatus.textContent = 'Syncing...';
-        elements.syncStatus.className = 'syncing';
-      }
-
-      // Update balance breakdown (simple version using existing balance)
-      const balance = state.balance || '0';
-      elements.debugBalanceTotal.textContent = formatNumber(balance);
-      elements.debugBalanceAvailable.textContent = formatNumber(balance);
+    try {
+      debugState = await sendMessage('getDebugState') as DebugState;
+      coins = await sendMessage('getCoins') as CoinInfo[];
+      connectionStatus = await sendMessage('getConnectionStatus') as ConnectionStatus;
+    } catch {
+      // Fallback to simple state if debug APIs not available
+      const state = await sendMessage('getState') as { hasWallet: boolean; balance?: string };
+      elements.syncProgressBar.style.width = state.hasWallet ? '100%' : '0%';
+      elements.syncStatus.textContent = state.hasWallet ? 'Connected' : 'No wallet';
+      elements.debugBalanceTotal.textContent = state.balance ? formatNumber(state.balance) : '-';
+      elements.debugBalanceAvailable.textContent = state.balance ? formatNumber(state.balance) : '-';
       elements.debugBalancePending.textContent = '0';
+      elements.debugCoinCount.textContent = '?';
+      elements.debugCoinList.innerHTML = '<span class="empty">Coin details unavailable</span>';
+      return;
+    }
+
+    // Update sync progress
+    if (debugState?.syncProgress) {
+      const progress = debugState.syncProgress;
+      elements.syncProgressBar.style.width = `${progress.percentage}%`;
+
+      // Show detailed sync info
+      const syncText = progress.isComplete
+        ? `Synced (${progress.appliedIndex})`
+        : `${progress.percentage}% (${progress.appliedIndex}/${progress.highestIndex})`;
+      elements.syncStatus.textContent = syncText;
+      elements.syncStatus.className = progress.isComplete ? 'synced' : 'syncing';
+      elements.syncStatus.title = `Applied: ${progress.appliedIndex}\nHighest: ${progress.highestIndex}\nRelevant: ${progress.highestRelevantIndex}`;
+
+      // Update header sync badge
+      elements.debugSyncBadge.textContent = progress.isComplete ? 'Synced' : `${progress.percentage}%`;
+      elements.debugSyncBadge.className = `sync-badge ${progress.isComplete ? 'synced' : 'syncing'}`;
+    } else if (debugState?.facadeStarted) {
+      elements.syncProgressBar.style.width = '0%';
+      elements.syncStatus.textContent = 'Starting...';
+      elements.syncStatus.className = 'syncing';
+      elements.debugSyncBadge.textContent = 'Starting';
+      elements.debugSyncBadge.className = 'sync-badge syncing';
     } else {
       elements.syncProgressBar.style.width = '0%';
-      elements.syncStatus.textContent = 'No wallet';
+      elements.syncStatus.textContent = 'Not started';
       elements.syncStatus.className = '';
+      elements.debugSyncBadge.textContent = '-';
+      elements.debugSyncBadge.className = 'sync-badge';
+    }
+
+    // Update balance breakdown
+    if (debugState?.balance) {
+      elements.debugBalanceTotal.textContent = formatNumber(debugState.balance.total);
+      elements.debugBalanceAvailable.textContent = formatNumber(debugState.balance.available);
+      elements.debugBalancePending.textContent = formatNumber(debugState.balance.pending);
+    } else {
       elements.debugBalanceTotal.textContent = '-';
       elements.debugBalanceAvailable.textContent = '-';
       elements.debugBalancePending.textContent = '-';
     }
 
-    // Simplified coin list - just show count based on balance
-    const hasCoins = state.balance && state.balance !== '0' && state.balance !== 'Loading...';
-    elements.debugCoinCount.textContent = hasCoins ? '?' : '0';
-    elements.debugCoinList.innerHTML = hasCoins
-      ? '<span class="empty">Coin details unavailable</span>'
-      : '<span class="empty">No coins</span>';
+    // Update coin list with detailed info
+    elements.debugCoinCount.textContent = coins.length.toString();
+    if (coins.length > 0) {
+      elements.debugCoinList.innerHTML = coins.map((coin, index) => renderCoinItem(coin, index)).join('');
+      // Add click handlers for expandable rows and restore expanded state
+      elements.debugCoinList.querySelectorAll('.coin-item').forEach((item) => {
+        const index = parseInt((item as HTMLElement).dataset.index ?? '0', 10);
+        // Restore expanded state from previous render
+        if (expandedCoinIndices.has(index)) {
+          item.classList.add('expanded');
+        }
+        item.addEventListener('click', () => {
+          item.classList.toggle('expanded');
+          // Track expanded state
+          if (item.classList.contains('expanded')) {
+            expandedCoinIndices.add(index);
+          } else {
+            expandedCoinIndices.delete(index);
+          }
+        });
+      });
+    } else {
+      elements.debugCoinList.innerHTML = '<span class="empty">No coins</span>';
+    }
 
-    // Connection status - infer from whether we got state
-    updateConnectionIndicator(elements.debugIndexerStatus, state.hasWallet ? 'connected' : 'unknown');
-    updateConnectionIndicator(elements.debugNodeStatus, 'unknown');
+    // Update connection status
+    if (connectionStatus) {
+      updateConnectionIndicator(elements.debugIndexerStatus, connectionStatus.indexerWs);
+      updateConnectionIndicator(elements.debugNodeStatus, connectionStatus.nodeRpc);
+    }
   } catch (error) {
     console.error('[Lumen] Failed to update debug panel:', error);
   }
+}
+
+// Render a single coin item with expandable details
+function renderCoinItem(coin: CoinInfo, index: number): string {
+  const statusClass = coin.status === 'spendable' ? 'spendable' : 'pending';
+  const value = formatNumber(coin.value);
+
+  // Format creation time
+  const createdAt = coin.createdAt
+    ? new Date(coin.createdAt).toLocaleString()
+    : 'Unknown';
+
+  // Format generation info
+  let generationHtml = '';
+  if (coin.generation) {
+    const gen = coin.generation;
+    const genTime = gen.generationTime
+      ? new Date(gen.generationTime).toLocaleString()
+      : 'Not started';
+    generationHtml = `
+      <div class="coin-detail">
+        <span class="label">Generation:</span>
+        <span>${genTime}</span>
+      </div>
+      <div class="coin-detail">
+        <span class="label">Generated:</span>
+        <span>${formatNumber(gen.currentlyGenerated)} / ${formatNumber(gen.maxCapacity)}</span>
+      </div>
+      <div class="coin-detail">
+        <span class="label">Rate:</span>
+        <span>${formatNumber(gen.rate)}/block</span>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="coin-item ${statusClass}" data-index="${index}">
+      <div class="coin-header">
+        <span class="coin-value">${value}</span>
+        <span class="coin-status">${coin.status}</span>
+        <span class="coin-expand">▶</span>
+      </div>
+      <div class="coin-details">
+        <div class="coin-detail">
+          <span class="label">Created:</span>
+          <span>${createdAt}</span>
+        </div>
+        <div class="coin-detail">
+          <span class="label">Seq:</span>
+          <span>${coin.sequenceNumber ?? '-'}</span>
+        </div>
+        <div class="coin-detail">
+          <span class="label">MT Index:</span>
+          <span>${coin.merkleTreeIndex ?? '-'}</span>
+        </div>
+        <div class="coin-detail">
+          <span class="label">Backing NIGHT:</span>
+          <span class="truncate">${coin.backingNightNonce ?? '-'}</span>
+        </div>
+        ${generationHtml}
+      </div>
+    </div>
+  `;
 }
 
 // Update a connection status indicator
@@ -536,12 +675,28 @@ async function copyDebugInfo(): Promise<void> {
   try {
     const state = await sendMessage('getState') as { hasWallet: boolean; address?: string; balance?: string; network?: string };
 
+    // Try to get detailed debug state
+    let debugState: DebugState | null = null;
+    let coins: CoinInfo[] = [];
+    let connectionStatus: ConnectionStatus | null = null;
+
+    try {
+      debugState = await sendMessage('getDebugState') as DebugState;
+      coins = await sendMessage('getCoins') as CoinInfo[];
+      connectionStatus = await sendMessage('getConnectionStatus') as ConnectionStatus;
+    } catch {
+      // Detailed state unavailable
+    }
+
     const debugInfo = {
       timestamp: new Date().toISOString(),
       hasWallet: state.hasWallet,
       address: state.address,
       balance: state.balance,
       network: state.network,
+      debugState,
+      coins,
+      connectionStatus,
     };
 
     await navigator.clipboard.writeText(JSON.stringify(debugInfo, null, 2));
@@ -556,6 +711,23 @@ elements.btnDebugToggle.addEventListener('click', toggleDebugPanel);
 
 // Event: Copy debug info
 elements.btnCopyDebug.addEventListener('click', copyDebugInfo);
+
+// Event: Tab switching
+elements.debugTabs.forEach((tab) => {
+  tab.addEventListener('click', () => {
+    const tabName = (tab as HTMLElement).dataset.tab;
+    if (!tabName) return;
+
+    // Update active tab button
+    elements.debugTabs.forEach((t) => t.classList.remove('active'));
+    tab.classList.add('active');
+
+    // Update active tab content
+    elements.tabContents.forEach((content) => {
+      content.classList.toggle('active', content.id === `tab-${tabName}`);
+    });
+  });
+});
 
 // Initialize
 loadWalletState();

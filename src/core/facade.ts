@@ -39,12 +39,28 @@ export interface DustBalance {
 export interface SyncProgress {
   /** Percentage complete (0-100) */
   percentage: number;
-  /** Current synced block */
-  currentBlock: number;
-  /** Target block to sync to */
-  targetBlock: number;
+  /** Applied index (blocks processed by wallet) */
+  appliedIndex: number;
+  /** Highest index (latest block on chain) */
+  highestIndex: number;
+  /** Highest relevant index (latest block with wallet activity) */
+  highestRelevantIndex: number;
   /** Whether sync is complete */
   isComplete: boolean;
+}
+
+/** Dust generation details for a coin */
+export interface DustGenerationInfo {
+  /** When dust generation started */
+  generationTime: string | null;
+  /** Maximum dust capacity */
+  maxCapacity: string;
+  /** When max capacity will be reached */
+  maxCapReachedAt: string;
+  /** Currently generated dust amount */
+  currentlyGenerated: string;
+  /** Generation rate */
+  rate: string;
 }
 
 export interface CoinInfo {
@@ -52,6 +68,23 @@ export interface CoinInfo {
   value: string;
   /** Coin status */
   status: 'spendable' | 'pending' | 'spent';
+  /** Creation time (ISO timestamp) */
+  createdAt: string | null;
+  /** Sequence number */
+  sequenceNumber: number | null;
+  /** Merkle tree index */
+  merkleTreeIndex: string | null;
+  /** Backing NIGHT nonce (hex) */
+  backingNightNonce: string | null;
+  /** Dust generation details (if available) */
+  generation: DustGenerationInfo | null;
+}
+
+/** Serializable balance for debug panel (uses strings instead of bigints) */
+export interface SerializableBalance {
+  total: string;
+  available: string;
+  pending: string;
 }
 
 export interface DebugState {
@@ -59,8 +92,8 @@ export interface DebugState {
   facadeStarted: boolean;
   /** Sync progress details */
   syncProgress: SyncProgress | null;
-  /** Balance breakdown */
-  balance: DustBalance | null;
+  /** Balance breakdown (serializable strings) */
+  balance: SerializableBalance | null;
   /** Number of coins */
   coinCount: number;
   /** Facade start timestamp */
@@ -246,10 +279,10 @@ export class LumenFacade {
     if (typeof progress.isStrictlyComplete === 'function') {
       return !progress.isStrictlyComplete();
     }
-    // Fall back: consider syncing if currentBlock < targetBlock
-    const currentBlock = Number(progress.currentBlockHeight ?? 0);
-    const targetBlock = Number(progress.latestBlockHeight ?? 0);
-    return targetBlock > 0 && currentBlock < targetBlock;
+    // Fall back: consider syncing if appliedIndex < highestIndex
+    const appliedIndex = Number(progress.appliedIndex ?? 0);
+    const highestIndex = Number(progress.highestIndex ?? 0);
+    return highestIndex > 0 && appliedIndex < highestIndex;
   }
 
   /**
@@ -277,40 +310,54 @@ export class LumenFacade {
 
     const state = await this.getCurrentState();
 
-    // Get sync progress
+    // Get sync progress using SDK's ProgressUpdate fields
     let syncProgress: SyncProgress | null = null;
     if (state) {
       const progress = state.progress;
 
-      // Calculate percentage from progress
-      // Progress has currentBlockHeight and latestBlockHeight
-      const currentBlock = Number(progress.currentBlockHeight ?? 0);
-      const targetBlock = Number(progress.latestBlockHeight ?? 0);
+      // SDK ProgressUpdate has: appliedIndex, highestIndex, highestRelevantIndex
+      const appliedIndex = Number(progress.appliedIndex ?? 0);
+      const highestIndex = Number(progress.highestIndex ?? 0);
+      const highestRelevantIndex = Number(progress.highestRelevantIndex ?? 0);
 
       // Check if sync is complete - try method first, fall back to property check
       let isComplete = false;
       if (typeof progress.isStrictlyComplete === 'function') {
         isComplete = progress.isStrictlyComplete();
       } else {
-        // Fall back: consider complete if currentBlock >= targetBlock and targetBlock > 0
-        isComplete = targetBlock > 0 && currentBlock >= targetBlock;
+        // Fall back: consider complete if appliedIndex >= highestIndex
+        // If highestIndex is 0 but we have appliedIndex, consider synced (localnet edge case)
+        isComplete = (highestIndex > 0 && appliedIndex >= highestIndex) || (highestIndex === 0 && appliedIndex > 0);
       }
 
-      const percentage = targetBlock > 0 ? Math.round((currentBlock / targetBlock) * 100) : 0;
+      // Calculate percentage, handling edge case where highestIndex is 0
+      const percentage = isComplete
+        ? 100
+        : highestIndex > 0
+          ? Math.round((appliedIndex / highestIndex) * 100)
+          : 0;
 
       syncProgress = {
         percentage: isComplete ? 100 : percentage,
-        currentBlock,
-        targetBlock,
+        appliedIndex,
+        highestIndex,
+        highestRelevantIndex,
         isComplete,
       };
     }
 
-    // Get balance
-    const balance = await this.getBalanceNonBlocking();
+    // Get balance (convert bigints to strings for serialization)
+    const rawBalance = await this.getBalanceNonBlocking();
+    const balance: SerializableBalance | null = rawBalance
+      ? {
+          total: rawBalance.total.toString(),
+          available: rawBalance.available.toString(),
+          pending: rawBalance.pending.toString(),
+        }
+      : null;
 
     // Get coin count
-    const coinCount = state?.spendableCoins?.length ?? 0;
+    const coinCount = state?.availableCoins?.length ?? 0;
 
     return {
       facadeStarted,
@@ -322,7 +369,7 @@ export class LumenFacade {
   }
 
   /**
-   * Get list of coins for debug display.
+   * Get list of coins for debug display with full details.
    */
   async getCoins(): Promise<CoinInfo[]> {
     const state = await this.getCurrentState();
@@ -331,20 +378,54 @@ export class LumenFacade {
     }
 
     const coins: CoinInfo[] = [];
+    const now = new Date();
 
-    // Add spendable coins
-    for (const coin of state.spendableCoins ?? []) {
-      coins.push({
-        value: coin.initialValue.toString(),
-        status: 'spendable',
-      });
+    // Get available coins with full generation info
+    try {
+      const fullInfoCoins = state.availableCoinsWithFullInfo(now);
+      for (const fullInfo of fullInfoCoins) {
+        const token = fullInfo.token;
+        coins.push({
+          value: token.initialValue.toString(),
+          status: 'spendable',
+          createdAt: token.ctime?.toISOString() ?? null,
+          sequenceNumber: token.seq ?? null,
+          merkleTreeIndex: token.mtIndex?.toString() ?? null,
+          backingNightNonce: token.backingNight?.toString() ?? null,
+          generation: {
+            generationTime: fullInfo.dtime?.toISOString() ?? null,
+            maxCapacity: fullInfo.maxCap?.toString() ?? '0',
+            maxCapReachedAt: fullInfo.maxCapReachedAt?.toISOString() ?? '',
+            currentlyGenerated: fullInfo.generatedNow?.toString() ?? '0',
+            rate: fullInfo.rate?.toString() ?? '0',
+          },
+        });
+      }
+    } catch {
+      // Fallback to basic coin info if availableCoinsWithFullInfo fails
+      for (const coin of state.availableCoins ?? []) {
+        coins.push({
+          value: coin.initialValue.toString(),
+          status: 'spendable',
+          createdAt: coin.ctime?.toISOString() ?? null,
+          sequenceNumber: coin.seq ?? null,
+          merkleTreeIndex: coin.mtIndex?.toString() ?? null,
+          backingNightNonce: coin.backingNight?.toString() ?? null,
+          generation: null,
+        });
+      }
     }
 
-    // Add pending coins
+    // Add pending coins (don't have generation info yet)
     for (const coin of state.pendingCoins ?? []) {
       coins.push({
         value: coin.initialValue.toString(),
         status: 'pending',
+        createdAt: coin.ctime?.toISOString() ?? null,
+        sequenceNumber: coin.seq ?? null,
+        merkleTreeIndex: coin.mtIndex?.toString() ?? null,
+        backingNightNonce: coin.backingNight?.toString() ?? null,
+        generation: null,
       });
     }
 

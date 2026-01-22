@@ -323,12 +323,91 @@ button.icon-btn:hover {
 }
 
 .debug-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   font-size: 11px;
   text-transform: uppercase;
   color: #667eea;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #2a2a3e;
+}
+
+.sync-badge {
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: #2a2a3e;
+  color: #888;
+}
+
+.sync-badge.synced {
+  background: rgba(76, 175, 80, 0.2);
+  color: #4caf50;
+}
+
+.sync-badge.syncing {
+  background: rgba(240, 173, 78, 0.2);
+  color: #f0ad4e;
+}
+
+/* Debug Tabs */
+.debug-tabs {
+  display: flex;
+  gap: 4px;
   margin-bottom: 12px;
   padding-bottom: 8px;
   border-bottom: 1px solid #2a2a3e;
+}
+
+.debug-tab {
+  flex: 1;
+  padding: 6px 8px;
+  font-size: 10px;
+  text-transform: uppercase;
+  background: transparent;
+  border: 1px solid #2a2a3e;
+  border-radius: 4px;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.debug-tab:hover {
+  background: #2a2a3e;
+  color: #aaa;
+}
+
+.debug-tab.active {
+  background: #2a2a3e;
+  border-color: #667eea;
+  color: #667eea;
+}
+
+/* Tab Content */
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+/* Placeholder message for unavailable tabs */
+.placeholder-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 20px;
+  color: #555;
+  text-align: center;
+}
+
+.placeholder-message .hint {
+  font-size: 9px;
+  color: #444;
 }
 
 .debug-section {
@@ -393,7 +472,7 @@ button.icon-btn:hover {
 
 /* Coin List */
 .debug-coin-list {
-  max-height: 100px;
+  max-height: 200px;
   overflow-y: auto;
   background: #1a1a2e;
   border-radius: 4px;
@@ -407,41 +486,100 @@ button.icon-btn:hover {
   color: #555;
 }
 
+/* Expandable Coin Items */
 .coin-item {
-  display: flex;
-  justify-content: space-between;
-  padding: 4px 8px;
   border-radius: 2px;
+  margin-bottom: 2px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.coin-item:hover {
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .coin-item:nth-child(odd) {
   background: rgba(255, 255, 255, 0.02);
 }
 
+.coin-item:nth-child(odd):hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.coin-header {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  gap: 8px;
+}
+
 .coin-value {
+  flex: 1;
   color: #aaa;
+  font-weight: 500;
 }
 
 .coin-status {
   font-size: 9px;
   text-transform: uppercase;
-  padding: 1px 4px;
+  padding: 2px 6px;
   border-radius: 2px;
+}
+
+.coin-expand {
+  font-size: 8px;
+  color: #555;
+  transition: transform 0.2s;
+}
+
+.coin-item.expanded .coin-expand {
+  transform: rotate(90deg);
 }
 
 .coin-item.spendable .coin-status {
   color: #4caf50;
-  background: rgba(76, 175, 80, 0.1);
+  background: rgba(76, 175, 80, 0.15);
 }
 
 .coin-item.pending .coin-status {
   color: #f0ad4e;
-  background: rgba(240, 173, 78, 0.1);
+  background: rgba(240, 173, 78, 0.15);
 }
 
 .coin-item.spent .coin-status {
   color: #666;
-  background: rgba(102, 102, 102, 0.1);
+  background: rgba(102, 102, 102, 0.15);
+}
+
+/* Coin Details (hidden by default) */
+.coin-details {
+  display: none;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 10px;
+}
+
+.coin-item.expanded .coin-details {
+  display: block;
+}
+
+.coin-detail {
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 0;
+  color: #888;
+}
+
+.coin-detail .label {
+  color: #555;
+}
+
+.coin-detail .truncate {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Connection Status Indicators */
