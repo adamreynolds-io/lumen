@@ -2,12 +2,12 @@
 
 ## Phase 1: Enhanced Coin Details (DustWallet)
 
-- [ ] 1.1 Update CoinInfo interface with detailed fields (ctime, seq, mtIndex, backingNight)
-- [ ] 1.2 Add DustGenerationInfo interface (dtime, maxCap, generatedNow, rate)
-- [ ] 1.3 Update getCoins() to return detailed coin data using availableCoinsWithFullInfo()
-- [ ] 1.4 Fix sync progress to use SDK's ProgressUpdate fields (appliedIndex, highestIndex, highestRelevantIndex)
-- [ ] 1.5 Update popup UI to display detailed coin info in expandable rows
-- [ ] 1.6 Test detailed coin display on localnet
+- [x] 1.1 Update CoinInfo interface with detailed fields (ctime, seq, mtIndex, backingNight)
+- [x] 1.2 Add DustGenerationInfo interface (dtime, maxCap, generatedNow, rate)
+- [x] 1.3 Update getCoins() to return detailed coin data using availableCoinsWithFullInfo()
+- [x] 1.4 Fix sync progress to use SDK's ProgressUpdate fields (appliedIndex, highestIndex, highestRelevantIndex)
+- [x] 1.5 Update popup UI to display detailed coin info in expandable rows
+- [x] 1.6 Test detailed coin display on localnet
 
 ## Phase 2: Full WalletFacade Integration
 
@@ -31,14 +31,14 @@
 
 ## Phase 4: Enhanced Debug UI
 
-- [ ] 4.1 Add tabbed sections for Dust / Shielded / Unshielded in debug panel
-- [ ] 4.2 Add expandable coin rows showing generation details
+- [x] 4.1 Add tabbed sections for Dust / Shielded / Unshielded in debug panel
+- [x] 4.2 Add expandable coin rows showing generation details
 - [ ] 4.3 Add shielded balances section with token type breakdown
 - [ ] 4.4 Add unshielded UTXOs section with registration status
 - [ ] 4.5 Add transaction history section (last 10 transactions)
-- [ ] 4.6 Update sync progress to show all index values
-- [ ] 4.7 Add "Export Full State" button for complete JSON dump
-- [ ] 4.8 Style new sections with consistent design
+- [x] 4.6 Update sync progress to show all index values
+- [x] 4.7 Add "Export Full State" button for complete JSON dump
+- [x] 4.8 Style new sections with consistent design
 
 ## Phase 5: Testing
 
