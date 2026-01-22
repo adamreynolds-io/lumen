@@ -73,7 +73,40 @@
 
 ## External Dependencies
 
+### NPM Packages (Public)
+
+Lumen uses **publicly published npm packages** from the `@midnight-ntwrk` scope on npmjs.com.
+
+#### dApp Connector
+- `@midnight-ntwrk/dapp-connector-api` - dApp connector interface
+
+#### Wallet SDK (Released)
+These packages have stable releases:
+- `@midnight-ntwrk/wallet-sdk-address-format` - Address formatting utilities
+- `@midnight-ntwrk/wallet-sdk-capabilities` - Wallet capability definitions
+- `@midnight-ntwrk/wallet-sdk-hd` - HD wallet derivation
+
+#### Wallet SDK (Pre-release Only)
+These packages only have pre-release versions (use with caution, API may change):
+- `@midnight-ntwrk/wallet-sdk-abstractions` - Core abstractions
+- `@midnight-ntwrk/wallet-sdk-dust-wallet` - DUST token wallet
+- `@midnight-ntwrk/wallet-sdk-facade` - High-level wallet facade
+- `@midnight-ntwrk/wallet-sdk-indexer-client` - Indexer integration
+- `@midnight-ntwrk/wallet-sdk-node-client` - Node RPC client
+- `@midnight-ntwrk/wallet-sdk-prover-client` - Zero-knowledge prover client
+- `@midnight-ntwrk/wallet-sdk-runtime` - Wallet runtime
+- `@midnight-ntwrk/wallet-sdk-shielded` - Shielded transactions
+- `@midnight-ntwrk/wallet-sdk-unshielded-state` - Unshielded state management
+- `@midnight-ntwrk/wallet-sdk-unshielded-wallet` - Unshielded wallet operations
+- `@midnight-ntwrk/wallet-sdk-utilities` - General utilities
+
+### Reference Repositories
+
+These repos are for reference only (understanding specs, reviewing implementations):
+- https://github.com/midnightntwrk/midnight-dapp-connector-api
+- https://github.com/midnightntwrk/midnight-wallet
+
+### Other
+
 - **Midnight Network**: https://midnight.network/ - The underlying blockchain
-- **midnight-dapp-connector-api**: https://github.com/midnightntwrk/midnight-dapp-connector-api - dApp connection interface
-- **midnight-wallet**: https://github.com/midnightntwrk/midnight-wallet - Reference wallet for compatibility testing
 - **Chrome Web Store** (future): For plugin distribution
