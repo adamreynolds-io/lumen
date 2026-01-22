@@ -199,34 +199,22 @@ export async function testConnection(rpcUrl: string): Promise<NetworkStatus> {
 
 /**
  * Query account balance from the chain.
- * Uses Substrate's system.account storage.
+ * Note: Balance queries are limited in dev wallet - returns 0 for now.
+ * Full balance tracking requires wallet-sdk integration with proper address formats.
  */
 export async function queryBalance(
-  rpcUrl: string,
-  address: string
+  _rpcUrl: string,
+  _address: string
 ): Promise<BalanceInfo> {
-  try {
-    const api = await getApi(rpcUrl);
-
-    // Query the account info from the system pallet
-    const accountInfo = await api.query.system.account(address);
-
-    // Extract balance data (structure may vary by chain)
-    const data = accountInfo.data;
-    const free = data.free.toString();
-    const reserved = data.reserved.toString();
-    const total = (BigInt(free) + BigInt(reserved)).toString();
-
-    return { free, reserved, total };
-  } catch (error) {
-    // If query fails (e.g., invalid address format), return zero balance
-    console.warn('[Network] Balance query failed:', error);
-    return {
-      free: '0',
-      reserved: '0',
-      total: '0',
-    };
-  }
+  // Developer wallet uses simplified address format (mn_loc_xxx)
+  // Full balance queries require wallet-sdk with proper Midnight address encoding
+  // For now, return 0 - this is acceptable for a dev/testing wallet
+  console.log('[Network] Balance query skipped - dev wallet limitation');
+  return {
+    free: '0',
+    reserved: '0',
+    total: '0',
+  };
 }
 
 // ============================================
