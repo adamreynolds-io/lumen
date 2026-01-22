@@ -15,24 +15,30 @@ const elements = {
   seedDisplay: document.getElementById('seed-display')!,
   importSeed: document.getElementById('import-seed')!,
   importKey: document.getElementById('import-key')!,
+  importHex: document.getElementById('import-hex')!,
   status: document.getElementById('status')!,
+  localnetWallets: document.getElementById('localnet-wallets')!,
 
   // Wallet info
   walletAddress: document.getElementById('wallet-address')!,
   walletBalance: document.getElementById('wallet-balance')!,
   networkSelect: document.getElementById('network-select') as HTMLSelectElement,
+  networkSelectInitial: document.getElementById('network-select-initial') as HTMLSelectElement,
   customRpc: document.getElementById('custom-rpc')!,
   rpcUrl: document.getElementById('rpc-url') as HTMLInputElement,
   seedWords: document.getElementById('seed-words')!,
   seedInput: document.getElementById('seed-input') as HTMLTextAreaElement,
   keyInput: document.getElementById('key-input') as HTMLInputElement,
+  hexInput: document.getElementById('hex-input') as HTMLInputElement,
 
   // Buttons
   btnGenerate: document.getElementById('btn-generate')!,
   btnImportSeed: document.getElementById('btn-import-seed')!,
   btnImportKey: document.getElementById('btn-import-key')!,
+  btnImportHex: document.getElementById('btn-import-hex')!,
   btnCopy: document.getElementById('btn-copy')!,
   btnCopySeed: document.getElementById('btn-copy-seed')!,
+  btnRefresh: document.getElementById('btn-refresh')!,
   btnTestConnection: document.getElementById('btn-test-connection')!,
   btnClearWallet: document.getElementById('btn-clear-wallet')!,
   btnConfirmSeed: document.getElementById('btn-confirm-seed')!,
@@ -40,6 +46,8 @@ const elements = {
   btnCancelImport: document.getElementById('btn-cancel-import')!,
   btnDoImportKey: document.getElementById('btn-do-import-key')!,
   btnCancelImportKey: document.getElementById('btn-cancel-import-key')!,
+  btnDoImportHex: document.getElementById('btn-do-import-hex')!,
+  btnCancelImportHex: document.getElementById('btn-cancel-import-hex')!,
 };
 
 // State
@@ -74,13 +82,13 @@ function showStatus(message: string, type: 'success' | 'error' | 'info'): void {
   // Add copy button for errors
   if (type === 'error') {
     const copyBtn = document.createElement('button');
-    copyBtn.textContent = '📋 Copy';
+    copyBtn.textContent = 'Copy';
     copyBtn.className = 'copy-error-btn';
     copyBtn.onclick = async (e) => {
       e.stopPropagation();
       await navigator.clipboard.writeText(message);
-      copyBtn.textContent = '✓ Copied';
-      setTimeout(() => copyBtn.textContent = '📋 Copy', 1500);
+      copyBtn.textContent = 'Copied';
+      setTimeout(() => (copyBtn.textContent = 'Copy'), 1500);
     };
     elements.status.appendChild(copyBtn);
   }
@@ -94,12 +102,15 @@ function showStatus(message: string, type: 'success' | 'error' | 'info'): void {
 }
 
 // Helper: Show section
-function showSection(section: 'no-wallet' | 'wallet' | 'seed-display' | 'import-seed' | 'import-key'): void {
+function showSection(
+  section: 'no-wallet' | 'wallet' | 'seed-display' | 'import-seed' | 'import-key' | 'import-hex'
+): void {
   elements.noWallet.classList.add('hidden');
   elements.walletLoaded.classList.add('hidden');
   elements.seedDisplay.classList.add('hidden');
   elements.importSeed.classList.add('hidden');
   elements.importKey.classList.add('hidden');
+  elements.importHex.classList.add('hidden');
 
   switch (section) {
     case 'no-wallet':
@@ -117,7 +128,15 @@ function showSection(section: 'no-wallet' | 'wallet' | 'seed-display' | 'import-
     case 'import-key':
       elements.importKey.classList.remove('hidden');
       break;
+    case 'import-hex':
+      elements.importHex.classList.remove('hidden');
+      break;
   }
+}
+
+// Helper: Update localnet wallet visibility
+function updateLocalnetVisibility(network: string): void {
+  elements.localnetWallets.classList.toggle('hidden', network !== 'localnet');
 }
 
 // Load wallet state from service worker
@@ -130,12 +149,16 @@ async function loadWalletState(): Promise<void> {
       network?: string;
     };
 
+    // Update network selects
+    if (state.network) {
+      elements.networkSelect.value = state.network;
+      elements.networkSelectInitial.value = state.network;
+      updateLocalnetVisibility(state.network);
+    }
+
     if (state.hasWallet && state.address) {
       elements.walletAddress.textContent = state.address;
       elements.walletBalance.textContent = state.balance ?? 'Loading...';
-      if (state.network) {
-        elements.networkSelect.value = state.network;
-      }
       showSection('wallet');
     } else {
       showSection('no-wallet');
@@ -145,6 +168,37 @@ async function loadWalletState(): Promise<void> {
     showSection('no-wallet');
   }
 }
+
+// Event: Initial network selection (before wallet import)
+elements.networkSelectInitial.addEventListener('change', async () => {
+  const network = elements.networkSelectInitial.value;
+  updateLocalnetVisibility(network);
+
+  try {
+    await sendMessage('setNetwork', { network });
+  } catch (error) {
+    console.error('[Lumen] Failed to set network:', error);
+  }
+});
+
+// Event: Localnet wallet buttons
+document.querySelectorAll('.localnet-btn').forEach((btn) => {
+  btn.addEventListener('click', async () => {
+    const walletName = (btn as HTMLElement).dataset.wallet;
+    if (!walletName) return;
+
+    try {
+      showStatus(`Importing ${walletName}...`, 'info');
+      const result = (await sendMessage('importLocalnetWallet', { walletName })) as {
+        address: string;
+      };
+      showStatus(`Imported ${walletName}`, 'success');
+      loadWalletState();
+    } catch (error) {
+      showStatus(`Import failed: ${error}`, 'error');
+    }
+  });
+});
 
 // Event: Generate new wallet
 elements.btnGenerate.addEventListener('click', async () => {
@@ -171,9 +225,9 @@ elements.btnGenerate.addEventListener('click', async () => {
 elements.btnCopySeed.addEventListener('click', async () => {
   if (currentSeedPhrase) {
     await navigator.clipboard.writeText(currentSeedPhrase.join(' '));
-    elements.btnCopySeed.textContent = '✓ Copied!';
+    elements.btnCopySeed.textContent = 'Copied!';
     setTimeout(() => {
-      elements.btnCopySeed.textContent = '📋 Copy Seed Phrase';
+      elements.btnCopySeed.textContent = 'Copy Seed Phrase';
     }, 2000);
   }
 });
@@ -240,6 +294,34 @@ elements.btnCancelImportKey.addEventListener('click', () => {
   showSection('no-wallet');
 });
 
+// Event: Show import hex form
+elements.btnImportHex.addEventListener('click', () => {
+  elements.hexInput.value = '';
+  showSection('import-hex');
+});
+
+// Event: Import from hex seed
+elements.btnDoImportHex.addEventListener('click', async () => {
+  const hexSeed = elements.hexInput.value.trim();
+  if (!hexSeed) {
+    showStatus('Please enter a hex seed', 'error');
+    return;
+  }
+
+  try {
+    await sendMessage('importFromHexSeed', { hexSeed });
+    showStatus('Wallet imported successfully', 'success');
+    loadWalletState();
+  } catch (error) {
+    showStatus(`Import failed: ${error}`, 'error');
+  }
+});
+
+// Event: Cancel import hex
+elements.btnCancelImportHex.addEventListener('click', () => {
+  showSection('no-wallet');
+});
+
 // Event: Copy address
 elements.btnCopy.addEventListener('click', async () => {
   const address = elements.walletAddress.textContent;
@@ -249,7 +331,20 @@ elements.btnCopy.addEventListener('click', async () => {
   }
 });
 
-// Event: Network change
+// Event: Refresh balance
+elements.btnRefresh.addEventListener('click', async () => {
+  try {
+    elements.walletBalance.textContent = 'Loading...';
+    const balance = (await sendMessage('refreshBalance')) as { total: string };
+    elements.walletBalance.textContent = balance.total;
+    showStatus('Balance refreshed', 'success');
+  } catch (error) {
+    elements.walletBalance.textContent = 'Error';
+    showStatus(`Failed to refresh: ${error}`, 'error');
+  }
+});
+
+// Event: Network change (wallet loaded state)
 elements.networkSelect.addEventListener('change', async () => {
   const network = elements.networkSelect.value;
   elements.customRpc.classList.toggle('hidden', network !== 'custom');
@@ -268,8 +363,16 @@ elements.networkSelect.addEventListener('change', async () => {
 elements.btnTestConnection.addEventListener('click', async () => {
   try {
     showStatus('Testing connection...', 'info');
-    await sendMessage('testConnection');
-    showStatus('Connection successful', 'success');
+    const status = (await sendMessage('testConnection')) as {
+      connected: boolean;
+      blockHeight?: number;
+      error?: string;
+    };
+    if (status.connected) {
+      showStatus(`Connected (block ${status.blockHeight})`, 'success');
+    } else {
+      showStatus(`Connection failed: ${status.error}`, 'error');
+    }
   } catch (error) {
     showStatus(`Connection failed: ${error}`, 'error');
   }

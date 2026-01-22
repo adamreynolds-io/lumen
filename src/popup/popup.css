@@ -63,7 +63,7 @@ header h1 {
   margin-bottom: 4px;
 }
 
-.address-row {
+.address-row, .balance-row {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -79,6 +79,12 @@ header h1 {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.balance-row span {
+  flex: 1;
+  font-family: 'SF Mono', Monaco, monospace;
+  font-size: 14px;
 }
 
 select, input, textarea {
@@ -235,4 +241,48 @@ button.icon-btn:hover {
 
 .copy-error-btn:hover {
   background: rgba(255,255,255,0.2);
+}
+
+/* Localnet prefunded wallets */
+.localnet-section {
+  margin: 12px 0;
+  padding: 12px;
+  background: #2a2a3e;
+  border-radius: 4px;
+  border: 1px solid #3a3a4e;
+}
+
+.localnet-section label {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #666;
+  margin-bottom: 8px;
+}
+
+.localnet-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.localnet-btn {
+  padding: 8px 12px;
+  font-size: 13px;
+  background: #1a1a2e;
+  border: 1px solid #444;
+  color: #aaa;
+}
+
+.localnet-btn:hover {
+  background: #3a3a4e;
+  color: #fff;
+  border-color: #667eea;
+}
+
+/* Hint text */
+.hint {
+  font-size: 11px;
+  color: #666;
+  margin-top: 8px;
 }

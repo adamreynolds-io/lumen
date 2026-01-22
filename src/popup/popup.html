@@ -16,10 +16,35 @@
     <!-- No Wallet State -->
     <div id="no-wallet" class="section">
       <p class="message">No wallet loaded</p>
+
+      <!-- Network selection before import -->
+      <div class="wallet-info">
+        <label>Network</label>
+        <select id="network-select-initial">
+          <option value="localnet">Localnet</option>
+          <option value="devnet" selected>DevNet</option>
+          <option value="qanet">QANET</option>
+          <option value="preview">Preview</option>
+          <option value="preprod">PreProd</option>
+        </select>
+      </div>
+
+      <!-- Localnet prefunded wallets (shown when localnet selected) -->
+      <div id="localnet-wallets" class="localnet-section hidden">
+        <label>Quick Import (Prefunded)</label>
+        <div class="localnet-buttons">
+          <button class="localnet-btn" data-wallet="wallet-0">Wallet 0</button>
+          <button class="localnet-btn" data-wallet="wallet-1">Wallet 1</button>
+          <button class="localnet-btn" data-wallet="wallet-2">Wallet 2</button>
+          <button class="localnet-btn" data-wallet="wallet-3">Wallet 3</button>
+        </div>
+      </div>
+
       <div class="actions">
         <button id="btn-generate">Generate New Wallet</button>
         <button id="btn-import-seed" class="secondary">Import Seed Phrase</button>
         <button id="btn-import-key" class="secondary">Import Private Key</button>
+        <button id="btn-import-hex" class="secondary">Import Hex Seed</button>
       </div>
     </div>
 
@@ -34,7 +59,10 @@
       </div>
       <div class="wallet-info">
         <label>DUST Balance</label>
-        <div id="wallet-balance">-</div>
+        <div class="balance-row">
+          <span id="wallet-balance">-</span>
+          <button id="btn-refresh" class="icon-btn" title="Refresh">🔄</button>
+        </div>
       </div>
       <div class="wallet-info">
         <label>Network</label>
@@ -48,8 +76,8 @@
         </select>
       </div>
       <div id="custom-rpc" class="wallet-info hidden">
-        <label>Custom RPC URL</label>
-        <input type="text" id="rpc-url" placeholder="https://...">
+        <label>Custom Node URL</label>
+        <input type="text" id="rpc-url" placeholder="wss://...">
       </div>
       <div class="actions">
         <button id="btn-test-connection" class="secondary">Test Connection</button>
@@ -59,10 +87,10 @@
 
     <!-- Seed Phrase Display (after generation) -->
     <div id="seed-display" class="section hidden">
-      <p class="warning">⚠️ Write down these words and keep them safe!</p>
+      <p class="warning">Write down these words and keep them safe!</p>
       <div id="seed-words" class="seed-words"></div>
       <div class="actions">
-        <button id="btn-copy-seed" class="secondary">📋 Copy Seed Phrase</button>
+        <button id="btn-copy-seed" class="secondary">Copy Seed Phrase</button>
         <button id="btn-confirm-seed">I've Saved My Seed Phrase</button>
       </div>
     </div>
@@ -84,6 +112,17 @@
       <div class="actions">
         <button id="btn-do-import-key">Import</button>
         <button id="btn-cancel-import-key" class="secondary">Cancel</button>
+      </div>
+    </div>
+
+    <!-- Import Hex Seed -->
+    <div id="import-hex" class="section hidden">
+      <label>Enter Hex Seed (64 or 128 chars)</label>
+      <input type="password" id="hex-input" placeholder="0x... or raw hex">
+      <p class="hint">For localnet prefunded wallets or custom seeds</p>
+      <div class="actions">
+        <button id="btn-do-import-hex">Import</button>
+        <button id="btn-cancel-import-hex" class="secondary">Cancel</button>
       </div>
     </div>
 
