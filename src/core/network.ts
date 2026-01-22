@@ -136,31 +136,56 @@ export function getRpcUrl(networkId: NetworkId, customNodeUrl?: string): string 
 
 /**
  * Test connection to a Midnight node.
- * Returns network status including block height and chain info.
+ * Uses HTTP health endpoint for fast, reliable checks.
  */
 export async function testConnection(rpcUrl: string): Promise<NetworkStatus> {
   const startTime = Date.now();
 
   try {
-    const api = await getApi(rpcUrl);
+    // Convert WS URL to HTTP for health check
+    const httpUrl = rpcUrl
+      .replace('wss://', 'https://')
+      .replace('ws://', 'http://');
 
-    // Get chain info
-    const [chain, version, chainType, header] = await Promise.all([
-      api.rpc.system.chain(),
-      api.rpc.system.version(),
-      api.rpc.system.chainType(),
-      api.rpc.chain.getHeader(),
-    ]);
+    // Use health endpoint for quick check
+    const healthResponse = await fetch(`${httpUrl}/health`, {
+      method: 'GET',
+      signal: AbortSignal.timeout(5000),
+    });
+
+    if (!healthResponse.ok) {
+      throw new Error(`Health check failed: ${healthResponse.status}`);
+    }
+
+    const health = await healthResponse.json();
+
+    // Get block height via RPC
+    const rpcResponse = await fetch(httpUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'chain_getHeader',
+        params: [],
+        id: 1,
+      }),
+      signal: AbortSignal.timeout(5000),
+    });
+
+    const rpcData = await rpcResponse.json();
+    const blockHeight = rpcData.result?.number
+      ? parseInt(rpcData.result.number, 16)
+      : undefined;
 
     const latency = Date.now() - startTime;
 
     return {
       connected: true,
-      blockHeight: header.number.toNumber(),
+      blockHeight,
       chainInfo: {
-        name: chain.toString(),
-        version: version.toString(),
-        chainType: chainType.toString(),
+        name: 'Midnight',
+        version: 'unknown',
+        chainType: health.isSyncing ? 'syncing' : 'ready',
       },
       latency,
     };
