@@ -445,7 +445,7 @@ interface DebugState {
 
 interface ConnectionStatus {
   indexerWs: 'connected' | 'connecting' | 'disconnected' | 'unknown';
-  nodeRpc: 'unknown';
+  nodeRpc: 'connected' | 'disconnected' | 'unknown';
   lastError: string | null;
 }
 

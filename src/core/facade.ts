@@ -104,7 +104,7 @@ export interface ConnectionStatus {
   /** Indexer WebSocket status */
   indexerWs: 'connected' | 'connecting' | 'disconnected' | 'unknown';
   /** Node RPC status */
-  nodeRpc: 'unknown';
+  nodeRpc: 'connected' | 'disconnected' | 'unknown';
   /** Last error message if any */
   lastError: string | null;
 }
@@ -434,7 +434,7 @@ export class LumenFacade {
 
   /**
    * Get connection status for debug display.
-   * Note: Limited info available from DustWallet - mainly inferring from state availability.
+   * Checks both indexer (via wallet state) and node RPC (via health endpoint).
    */
   async getConnectionStatus(): Promise<ConnectionStatus> {
     if (!this.dustWallet) {
@@ -445,12 +445,31 @@ export class LumenFacade {
       };
     }
 
-    // Try to get state - if we can, we're connected
+    // Try to get state - if we can, indexer is connected
     const state = await this.getCurrentState();
+    const indexerWs = state ? 'connected' : 'connecting';
+
+    // Check node RPC by calling health endpoint
+    let nodeRpc: 'connected' | 'disconnected' | 'unknown' = 'unknown';
+    try {
+      const response = await fetch(this.config.nodeUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'system_health',
+          params: [],
+          id: 1,
+        }),
+      });
+      nodeRpc = response.ok ? 'connected' : 'disconnected';
+    } catch {
+      nodeRpc = 'disconnected';
+    }
 
     return {
-      indexerWs: state ? 'connected' : 'connecting',
-      nodeRpc: 'unknown', // DustWallet doesn't expose node connection status directly
+      indexerWs,
+      nodeRpc,
       lastError: null,
     };
   }
