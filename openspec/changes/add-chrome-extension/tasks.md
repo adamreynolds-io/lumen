@@ -92,26 +92,34 @@
 - Shielded operations return empty/not-implemented (developer wallet focus)
 - Test page updated to demonstrate full API flow
 
-## Phase 6: Popup UI
+## Phase 6: Popup UI ✅
 
-- [ ] Create popup.html structure
-- [ ] Create popup.css styles (minimal, developer-focused)
-- [ ] Implement "No Wallet" state view
-- [ ] Implement "Generate Wallet" flow with seed phrase display
-- [ ] Implement "Import Wallet" flow (seed phrase input)
-- [ ] Implement "Import Private Key" flow
-- [ ] Display wallet address with copy button
-- [ ] Display DUST balance
-- [ ] Implement network selector (presets + custom)
-- [ ] Implement connection test button
-- [ ] Show dApp connection status
+- [x] Create popup.html structure
+- [x] Create popup.css styles (minimal, developer-focused)
+- [x] Implement "No Wallet" state view
+- [x] Implement "Generate Wallet" flow with seed phrase display
+- [x] Implement "Import Wallet" flow (seed phrase input)
+- [x] Implement "Import Private Key" flow
+- [x] Implement "Import Hex Seed" flow (localnet prefunded wallets)
+- [x] Display wallet address with copy button
+- [x] Display DUST balance with refresh button
+- [x] Implement network selector (presets + custom, in both no-wallet and wallet states)
+- [x] Implement connection test button (shows block height)
+- [x] Implement localnet prefunded wallet quick-import buttons
+
+**Implementation Notes**:
+- Network selector available before wallet import to select target network
+- Localnet shows quick-import buttons for prefunded wallets (0-3)
+- Hex seed import for custom 32-byte or 64-byte seeds
+- Balance refresh button with loading state
+- Connection test displays block height on success
 
 ## Phase 7: Integration & Polish
 
-- [ ] End-to-end test: generate wallet → connect dApp → sign transaction
-- [ ] Test with dapp-connector-api example if available
-- [ ] Handle edge cases (network errors, invalid inputs)
-- [ ] Add loading states and error messages
+- [x] Manual test page for dApp connector (test/dapp-test.html)
+- [ ] End-to-end test with actual Midnight dApp
+- [x] Handle edge cases (network errors, invalid inputs)
+- [x] Add loading states and error messages
 - [ ] README with usage instructions
 
 ## Dependencies
