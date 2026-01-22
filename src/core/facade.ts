@@ -509,10 +509,43 @@ export class LumenFacade {
         for (const [tokenType, amount] of Object.entries(shieldedState.balances ?? {})) {
           balances[tokenType] = (amount as bigint).toString();
         }
+
+        // Extract address string from SDK address object (has coinPublicKey property)
+        let addressStr: string | null = null;
+        if (shieldedState.address) {
+          const addr = shieldedState.address as { coinPublicKey?: unknown };
+          const cpk = addr.coinPublicKey;
+
+          if (cpk instanceof Uint8Array) {
+            addressStr = Array.from(cpk).map(b => b.toString(16).padStart(2, '0')).join('');
+          } else if (Array.isArray(cpk)) {
+            addressStr = cpk.map((b: number) => b.toString(16).padStart(2, '0')).join('');
+          } else if (typeof cpk === 'bigint') {
+            addressStr = cpk.toString(16).padStart(64, '0');
+          } else if (typeof cpk === 'string') {
+            addressStr = cpk;
+          } else if (cpk && typeof cpk === 'object') {
+            const cpkObj = cpk as Record<string, unknown>;
+            if (cpkObj.bytes instanceof Uint8Array) {
+              addressStr = Array.from(cpkObj.bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+            } else if (typeof cpkObj.toHex === 'function') {
+              addressStr = (cpkObj.toHex as () => string)();
+            } else {
+              // Find first Uint8Array property
+              for (const val of Object.values(cpkObj)) {
+                if (val instanceof Uint8Array) {
+                  addressStr = Array.from(val).map(b => b.toString(16).padStart(2, '0')).join('');
+                  break;
+                }
+              }
+            }
+          }
+        }
+
         shielded = {
           balances,
           coinCount: shieldedState.totalCoins?.length ?? 0,
-          address: shieldedState.address?.toString() ?? null,
+          address: addressStr,
           syncProgress: shieldedState.state?.progress ? this.extractSyncProgress(shieldedState.state.progress) : null,
         };
       }

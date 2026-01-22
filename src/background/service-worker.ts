@@ -43,12 +43,13 @@ import {
 
 import {
   LumenFacade,
-  createDustOnlyFacade,
+  createFacade,
   createFacadeConfig,
   type DustBalance,
   type DebugState,
   type CoinInfo,
   type ConnectionStatus,
+  type WalletKeys as FacadeWalletKeys,
 } from '../core/facade.js';
 
 console.log('[Lumen] Service worker starting...');
@@ -189,12 +190,22 @@ async function initializeFacade(): Promise<void> {
     urls.proverUrl
   );
 
-  // Create and start facade with the HD-derived dust key (not raw seed)
-  facade = createDustOnlyFacade(config, currentKeys.dustKey);
+  // Create full wallet keys for WalletFacade
+  const facadeKeys: FacadeWalletKeys = {
+    dustKey: currentKeys.dustKey,
+    // Use Night External key for shielded wallet (ZswapSecretKeys)
+    shieldedKey: currentKeys.nightExternalKey,
+    // Unshielded public key is derived from shielded keys inside facade
+    unshieldedPublicKey: new Uint8Array(32), // Placeholder, derived internally
+  };
+
+  // Create and start full facade
+  facade = createFacade(config, facadeKeys);
 
   try {
-    await facade.start();
-    console.log('[Lumen] Facade initialized and syncing');
+    // Enable full WalletFacade mode (ShieldedWallet + UnshieldedWallet + DustWallet)
+    await facade.start(true);
+    console.log('[Lumen] Full WalletFacade initialized and syncing');
 
     // Start balance polling
     startBalancePolling();
