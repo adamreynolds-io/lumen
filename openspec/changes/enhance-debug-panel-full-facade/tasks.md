@@ -20,14 +20,14 @@
 - [x] 2.7 Expose FacadeState with shielded, unshielded, and dust state
 - [ ] 2.8 Test WalletFacade initialization and sync on localnet (pending manual test)
 
-## Phase 3: Enhanced Debug State Types
+## Phase 3: Enhanced Debug State Types ✅
 
-- [ ] 3.1 Add ShieldedDebugState interface (balances by token type, coin counts, address, progress)
-- [ ] 3.2 Add UnshieldedDebugState interface (balances, UTXOs, registration status)
-- [ ] 3.3 Add TransactionInfo interface for transaction history display
-- [ ] 3.4 Update DebugState to include shielded, unshielded, and dust sections
-- [ ] 3.5 Add getFullDebugState() method returning comprehensive state
-- [ ] 3.6 Update service worker handlers for new debug state
+- [x] 3.1 Add ShieldedDebugState interface (balances by token type, coin counts, address, progress)
+- [x] 3.2 Add UnshieldedDebugState interface (balances, UTXOs, registration status)
+- [x] 3.3 Add TransactionInfo interface for transaction history display
+- [x] 3.4 Update DebugState to include shielded, unshielded, and dust sections
+- [x] 3.5 getDebugState() returns comprehensive state including shielded/unshielded
+- [x] 3.6 Service worker handlers already support new debug state
 
 ## Phase 4: Enhanced Debug UI
 

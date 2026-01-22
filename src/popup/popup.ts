@@ -446,6 +446,15 @@ interface UnshieldedDebugState {
   syncProgress: SyncProgress | null;
 }
 
+interface TransactionInfo {
+  id: string;
+  type: 'transfer' | 'swap' | 'registration' | 'unknown';
+  timestamp: string | null;
+  status: 'confirmed' | 'pending' | 'failed';
+  amount: string | null;
+  tokenType: string | null;
+}
+
 interface DebugState {
   facadeStarted: boolean;
   syncProgress: SyncProgress | null;
@@ -458,6 +467,7 @@ interface DebugState {
   facadeStartTime: string | null;
   shielded: ShieldedDebugState | null;
   unshielded: UnshieldedDebugState | null;
+  recentTransactions: TransactionInfo[];
 }
 
 type ServiceStatus = 'healthy' | 'degraded' | 'unhealthy' | 'unknown';

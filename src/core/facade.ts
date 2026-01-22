@@ -130,6 +130,22 @@ export interface UnshieldedDebugState {
   syncProgress: SyncProgress | null;
 }
 
+/** Transaction info for history display */
+export interface TransactionInfo {
+  /** Transaction ID (hex) */
+  id: string;
+  /** Transaction type */
+  type: 'transfer' | 'swap' | 'registration' | 'unknown';
+  /** Timestamp (ISO) */
+  timestamp: string | null;
+  /** Status */
+  status: 'confirmed' | 'pending' | 'failed';
+  /** Amount (if applicable) */
+  amount: string | null;
+  /** Token type (if applicable) */
+  tokenType: string | null;
+}
+
 export interface DebugState {
   /** Whether facade is started */
   facadeStarted: boolean;
@@ -145,6 +161,8 @@ export interface DebugState {
   shielded: ShieldedDebugState | null;
   /** Unshielded wallet state (if available) */
   unshielded: UnshieldedDebugState | null;
+  /** Recent transactions (if available) */
+  recentTransactions: TransactionInfo[];
 }
 
 export interface ConnectionStatus {
@@ -459,6 +477,7 @@ export class LumenFacade {
         facadeStartTime: null,
         shielded: null,
         unshielded: null,
+        recentTransactions: [],
       };
     }
 
@@ -521,6 +540,7 @@ export class LumenFacade {
       facadeStartTime: this.startTime?.toISOString() ?? null,
       shielded,
       unshielded,
+      recentTransactions: [], // TODO: Implement transaction history extraction
     };
   }
 
