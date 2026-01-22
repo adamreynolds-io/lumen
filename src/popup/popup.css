@@ -46,19 +46,19 @@ header h1 {
 .header-btn {
   margin-left: auto;
   padding: 6px;
-  background: transparent;
-  border: 1px solid transparent;
+  background: #fff;
+  border: none;
   border-radius: 4px;
   cursor: pointer;
   transition: background 0.2s;
-  color: #fff;
+  color: #1a1a2e;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .header-btn:hover {
-  background: #2a2a3e;
+  background: #ddd;
 }
 
 .header-btn svg {
@@ -330,19 +330,19 @@ button.icon-btn:hover {
 /* Debug Toggle Button */
 .debug-toggle {
   padding: 6px;
-  background: transparent;
-  border: 1px solid transparent;
+  background: #fff;
+  border: none;
   border-radius: 4px;
   cursor: pointer;
   transition: background 0.2s;
-  color: #fff;
+  color: #1a1a2e;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .debug-toggle:hover {
-  background: #2a2a3e;
+  background: #ddd;
 }
 
 .debug-toggle.active {
