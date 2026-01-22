@@ -18,7 +18,7 @@
 - [x] 2.5 Refactor facade.ts to create full WalletFacade (ShieldedWallet + UnshieldedWallet + DustWallet)
 - [x] 2.6 Update facade configuration to include all required services
 - [x] 2.7 Expose FacadeState with shielded, unshielded, and dust state
-- [ ] 2.8 Test WalletFacade initialization and sync on localnet (pending manual test)
+- [x] 2.8 Test WalletFacade initialization and sync on localnet
 
 ## Phase 3: Enhanced Debug State Types ✅
 
