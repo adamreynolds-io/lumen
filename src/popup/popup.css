@@ -125,12 +125,12 @@ button {
   transition: background 0.2s;
 }
 
-button:not(.secondary):not(.danger):not(.icon-btn) {
+button:not(.secondary):not(.danger):not(.icon-btn):not(.debug-tab) {
   background: linear-gradient(135deg, #667eea, #764ba2);
   color: #fff;
 }
 
-button:not(.secondary):not(.danger):not(.icon-btn):hover {
+button:not(.secondary):not(.danger):not(.icon-btn):not(.debug-tab):hover {
   background: linear-gradient(135deg, #5a6fd6, #6a4190);
 }
 
