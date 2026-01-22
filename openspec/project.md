@@ -103,8 +103,8 @@ These packages only have pre-release versions (use with caution, API may change)
 ### Reference Repositories
 
 These repos are for reference only (understanding specs, reviewing implementations):
-- https://github.com/midnightntwrk/dapp-connector-api
-- https://github.com/midnightntwrk/wallet-sdk
+- https://github.com/midnightntwrk/midnight-dapp-connector-api
+- https://github.com/midnightntwrk/midnight-wallet
 
 ### Other
 
