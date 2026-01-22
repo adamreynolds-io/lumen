@@ -273,6 +273,7 @@ export function importFromMnemonic(
 
 /**
  * Import a wallet from a raw private key (hex).
+ * Accepts 64 hex chars (32 bytes) which will be padded to 64 bytes.
  */
 export function importFromPrivateKey(
   privateKeyHex: string,
@@ -303,6 +304,67 @@ export function importFromPrivateKey(
 
   // Derive keys
   const keysResult = deriveKeys(paddedSeed);
+  if (!keysResult.success) {
+    return keysResult;
+  }
+
+  // Format address
+  const address = formatDustAddress(keysResult.data.dustKey, networkId);
+  const publicKeyHex = keyToHex(keysResult.data.dustKey);
+
+  return {
+    success: true,
+    data: {
+      keys: keysResult.data,
+      info: {
+        address,
+        publicKeyHex,
+        networkId,
+      },
+    },
+  };
+}
+
+/**
+ * Import a wallet from a hex seed.
+ * Accepts either 64 hex chars (32 bytes, will be padded) or 128 hex chars (64 bytes).
+ * Used for prefunded localnet wallets.
+ */
+export function importFromHexSeed(
+  hexSeed: string,
+  networkId: string
+): WalletResult<{
+  keys: WalletKeys;
+  info: WalletInfo;
+}> {
+  // Clean and validate hex
+  const cleanHex = hexSeed.replace(/^0x/, '').toLowerCase();
+
+  if (!/^[0-9a-f]{64}$/.test(cleanHex) && !/^[0-9a-f]{128}$/.test(cleanHex)) {
+    return {
+      success: false,
+      error: 'Invalid seed format. Expected 64 or 128 hex characters.',
+    };
+  }
+
+  // Convert to bytes
+  const byteLength = cleanHex.length / 2;
+  const seedBytes = new Uint8Array(byteLength);
+  for (let i = 0; i < byteLength; i++) {
+    seedBytes[i] = parseInt(cleanHex.slice(i * 2, i * 2 + 2), 16);
+  }
+
+  // Pad to 64 bytes if needed
+  let seed: Uint8Array;
+  if (byteLength === 32) {
+    seed = new Uint8Array(64);
+    seed.set(seedBytes, 0);
+  } else {
+    seed = seedBytes;
+  }
+
+  // Derive keys
+  const keysResult = deriveKeys(seed);
   if (!keysResult.success) {
     return keysResult;
   }

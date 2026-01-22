@@ -12,6 +12,7 @@ import {
   createWallet,
   importFromMnemonic,
   importFromPrivateKey,
+  importFromHexSeed,
   signMessage,
   signTransaction,
   type WalletKeys,
@@ -25,6 +26,7 @@ import {
   type LumenResponse,
   type ErrorCode,
   LumenError,
+  LOCALNET_SEEDS,
 } from '../core/types.js';
 
 import {
@@ -154,6 +156,68 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
     walletState.balance = '0';
 
     console.log('[Lumen] Wallet imported from key:', result.data.info.address);
+
+    return { success: true, address: result.data.info.address };
+  },
+
+  // Get available localnet prefunded wallets
+  getLocalnetSeeds: () => {
+    return Object.keys(LOCALNET_SEEDS).map((name) => ({
+      name,
+      description: `Prefunded localnet ${name}`,
+    }));
+  },
+
+  // Import a prefunded localnet wallet
+  importLocalnetWallet: (params: { walletName: string }) => {
+    const { walletName } = params;
+    const seed = LOCALNET_SEEDS[walletName];
+
+    if (!seed) {
+      throw new LumenError(
+        `Unknown localnet wallet: ${walletName}. Available: ${Object.keys(LOCALNET_SEEDS).join(', ')}`,
+        'INVALID_INPUT'
+      );
+    }
+
+    const networkId = getNetworkId();
+    const result = importFromHexSeed(seed, networkId);
+
+    if (!result.success) {
+      throw new LumenError(result.error, 'INVALID_INPUT');
+    }
+
+    currentKeys = result.data.keys;
+    currentWalletInfo = result.data.info;
+
+    walletState.hasWallet = true;
+    walletState.address = result.data.info.address;
+    walletState.balance = '0';
+
+    console.log('[Lumen] Localnet wallet imported:', walletName, result.data.info.address);
+
+    return { success: true, address: result.data.info.address, walletName };
+  },
+
+  // Import from hex seed (custom seed)
+  importFromHexSeed: (params: { hexSeed: string }) => {
+    const { hexSeed } = params;
+    const networkId = getNetworkId();
+
+    const result = importFromHexSeed(hexSeed, networkId);
+
+    if (!result.success) {
+      throw new LumenError(result.error, 'INVALID_INPUT');
+    }
+
+    currentKeys = result.data.keys;
+    currentWalletInfo = result.data.info;
+
+    walletState.hasWallet = true;
+    walletState.address = result.data.info.address;
+    walletState.balance = '0';
+
+    console.log('[Lumen] Wallet imported from hex seed:', result.data.info.address);
 
     return { success: true, address: result.data.info.address };
   },

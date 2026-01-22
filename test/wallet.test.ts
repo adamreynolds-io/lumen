@@ -12,10 +12,13 @@ import {
   createWallet,
   importFromMnemonic,
   importFromPrivateKey,
+  importFromHexSeed,
   signMessage,
   signTransaction,
   keyToHex,
 } from '../src/core/wallet.js';
+
+import { LOCALNET_SEEDS } from '../src/core/types.js';
 
 // Simple test framework
 let passed = 0;
@@ -200,6 +203,56 @@ test('importFromPrivateKey rejects invalid hex', () => {
 test('importFromPrivateKey rejects wrong length', () => {
   const result = importFromPrivateKey('0x1234', 'devnet');
   assert(!result.success, 'Should fail');
+});
+
+// Hex Seed Import Tests
+test('importFromHexSeed succeeds with 64-char hex (32 bytes)', () => {
+  const seed32 = LOCALNET_SEEDS['wallet-0']; // 64 hex chars
+  const result = importFromHexSeed(seed32, 'localnet');
+  assert(result.success, 'Should succeed with 32-byte seed');
+  if (result.success) {
+    assert(result.data.info.address.length > 0, 'Should have address');
+  }
+});
+
+test('importFromHexSeed succeeds with 128-char hex (64 bytes)', () => {
+  const seed64 = LOCALNET_SEEDS['wallet-3']; // 128 hex chars
+  const result = importFromHexSeed(seed64, 'localnet');
+  assert(result.success, 'Should succeed with 64-byte seed');
+  if (result.success) {
+    assert(result.data.info.address.length > 0, 'Should have address');
+  }
+});
+
+test('importFromHexSeed is deterministic', () => {
+  const seed = LOCALNET_SEEDS['wallet-0'];
+  const result1 = importFromHexSeed(seed, 'localnet');
+  const result2 = importFromHexSeed(seed, 'localnet');
+
+  assert(result1.success && result2.success, 'Both should succeed');
+  if (result1.success && result2.success) {
+    assertEqual(
+      result1.data.info.address,
+      result2.data.info.address,
+      'Addresses should match'
+    );
+  }
+});
+
+test('importFromHexSeed rejects invalid hex', () => {
+  const result = importFromHexSeed('not-valid-hex', 'localnet');
+  assert(!result.success, 'Should fail with invalid hex');
+});
+
+test('importFromHexSeed rejects wrong length', () => {
+  const result = importFromHexSeed('1234abcd', 'localnet');
+  assert(!result.success, 'Should fail with wrong length');
+});
+
+test('importFromHexSeed accepts 0x prefix', () => {
+  const seed = '0x' + LOCALNET_SEEDS['wallet-0'];
+  const result = importFromHexSeed(seed, 'localnet');
+  assert(result.success, 'Should accept 0x prefix');
 });
 
 // Signing Tests

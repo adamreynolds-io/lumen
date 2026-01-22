@@ -110,6 +110,14 @@ export class LumenError extends Error {
   }
 }
 
+// Prefunded localnet wallet seeds (for development/testing)
+export const LOCALNET_SEEDS: Record<string, string> = {
+  'wallet-0': '0000000000000000000000000000000000000000000000000000000000000001',
+  'wallet-1': '0000000000000000000000000000000000000000000000000000000000000002',
+  'wallet-2': '0000000000000000000000000000000000000000000000000000000000000003',
+  'wallet-3': 'a51c86de32d0791f7cffc3bdff1abd9bb54987f0ed5effc30c936dddbb9afd9d530c8db445e4f2d3ea42a321b260e022aadf05987c9a67ec7b6b6ca1d0593ec9',
+};
+
 // dApp connector types (aligned with dapp-connector-api)
 export interface EnableResult {
   enabled: boolean;
