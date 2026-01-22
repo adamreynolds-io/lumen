@@ -22,10 +22,7 @@ const elements = {
   // Wallet info
   walletAddress: document.getElementById('wallet-address')!,
   walletBalance: document.getElementById('wallet-balance')!,
-  networkSelect: document.getElementById('network-select') as HTMLSelectElement,
   networkSelectInitial: document.getElementById('network-select-initial') as HTMLSelectElement,
-  customRpc: document.getElementById('custom-rpc')!,
-  rpcUrl: document.getElementById('rpc-url') as HTMLInputElement,
   seedWords: document.getElementById('seed-words')!,
   seedInput: document.getElementById('seed-input') as HTMLTextAreaElement,
   keyInput: document.getElementById('key-input') as HTMLInputElement,
@@ -195,9 +192,8 @@ async function loadWalletState(): Promise<void> {
       network?: string;
     };
 
-    // Update network selects
+    // Update network select (initial selector only, wallet-loaded has no selector)
     if (state.network) {
-      elements.networkSelect.value = state.network;
       elements.networkSelectInitial.value = state.network;
       updateLocalnetVisibility(state.network);
     }
@@ -374,21 +370,6 @@ elements.btnCopy.addEventListener('click', async () => {
   if (address && address !== '-') {
     await navigator.clipboard.writeText(address);
     showStatus('Address copied', 'success');
-  }
-});
-
-// Event: Network change (wallet loaded state)
-elements.networkSelect.addEventListener('change', async () => {
-  const network = elements.networkSelect.value;
-  elements.customRpc.classList.toggle('hidden', network !== 'custom');
-
-  if (network !== 'custom') {
-    try {
-      await sendMessage('setNetwork', { network });
-      showStatus(`Switched to ${network}`, 'success');
-    } catch (error) {
-      showStatus(`Failed to switch network: ${error}`, 'error');
-    }
   }
 });
 
