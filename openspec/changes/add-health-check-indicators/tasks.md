@@ -28,11 +28,11 @@
 - [x] 3.6 Add hover/click to show latency and last-checked time
 - [x] 3.7 ~~Wire up refresh button~~ (not needed - auto-refresh every 1s)
 
-## Phase 4: Testing
+## Phase 4: Testing ✅
 
-- [ ] 4.1 Test with all services running (all green)
-- [ ] 4.2 Test with indexer stopped (indexer red, others green)
-- [ ] 4.3 Test with node stopped (all red - dependency)
-- [ ] 4.4 Test with prover stopped (prover red, others green)
-- [ ] 4.5 Test manual refresh button
-- [ ] 4.6 Verify latency display updates correctly
+- [x] 4.1 Test with all services running (all green)
+- [x] 4.2 Test with indexer stopped (indexer red, others green)
+- [x] 4.3 Test with node stopped (all red - dependency)
+- [x] 4.4 Test with prover stopped (prover red, others green)
+- [x] 4.5 ~~Test manual refresh button~~ (removed - auto-refresh handles it)
+- [x] 4.6 Verify latency display updates correctly
