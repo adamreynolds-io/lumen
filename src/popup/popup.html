@@ -143,9 +143,29 @@
         <div id="tab-shielded" class="tab-content">
           <div class="debug-section">
             <div class="debug-label">Shielded Wallet</div>
-            <div class="placeholder-message">
+            <div id="shielded-not-available" class="placeholder-message">
               <span>Not available</span>
-              <span class="hint">Full WalletFacade required (Phase 2)</span>
+              <span class="hint">Enable full WalletFacade mode</span>
+            </div>
+            <div id="shielded-content" class="hidden">
+              <div class="debug-value">
+                <span class="label">Address:</span>
+                <span id="shielded-address" class="truncate">-</span>
+              </div>
+              <div class="debug-value">
+                <span class="label">Coins:</span>
+                <span id="shielded-coin-count">0</span>
+              </div>
+              <div class="debug-subsection">
+                <div class="debug-label">Balances by Token</div>
+                <div id="shielded-balances" class="balance-list">
+                  <div class="placeholder-message"><span>No balances</span></div>
+                </div>
+              </div>
+              <div class="debug-subsection">
+                <div class="debug-label">Sync Progress</div>
+                <div id="shielded-sync-progress" class="debug-value">-</div>
+              </div>
             </div>
           </div>
         </div>
@@ -154,10 +174,36 @@
         <div id="tab-unshielded" class="tab-content">
           <div class="debug-section">
             <div class="debug-label">Unshielded Wallet</div>
-            <div class="placeholder-message">
+            <div id="unshielded-not-available" class="placeholder-message">
               <span>Not available</span>
-              <span class="hint">Full WalletFacade required (Phase 2)</span>
+              <span class="hint">Enable full WalletFacade mode</span>
             </div>
+            <div id="unshielded-content" class="hidden">
+              <div class="debug-value">
+                <span class="label">Balance:</span>
+                <span id="unshielded-balance">0</span>
+              </div>
+              <div class="debug-value">
+                <span class="label">UTXOs:</span>
+                <span id="unshielded-utxo-count">0</span>
+              </div>
+              <div class="debug-value">
+                <span class="label">Registered:</span>
+                <span id="unshielded-registered">No</span>
+              </div>
+              <div class="debug-subsection">
+                <div class="debug-label">Sync Progress</div>
+                <div id="unshielded-sync-progress" class="debug-value">-</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Transaction History (visible in all tabs when available) -->
+        <div id="tx-history-section" class="debug-section hidden">
+          <div class="debug-label">Recent Transactions</div>
+          <div id="tx-history-list" class="tx-list">
+            <div class="placeholder-message"><span>No transactions</span></div>
           </div>
         </div>
 

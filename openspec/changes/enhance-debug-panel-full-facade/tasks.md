@@ -29,13 +29,13 @@
 - [x] 3.5 getDebugState() returns comprehensive state including shielded/unshielded
 - [x] 3.6 Service worker handlers already support new debug state
 
-## Phase 4: Enhanced Debug UI
+## Phase 4: Enhanced Debug UI ✅
 
 - [x] 4.1 Add tabbed sections for Dust / Shielded / Unshielded in debug panel
 - [x] 4.2 Add expandable coin rows showing generation details
-- [ ] 4.3 Add shielded balances section with token type breakdown
-- [ ] 4.4 Add unshielded UTXOs section with registration status
-- [ ] 4.5 Add transaction history section (last 10 transactions)
+- [x] 4.3 Add shielded balances section with token type breakdown
+- [x] 4.4 Add unshielded UTXOs section with registration status
+- [x] 4.5 Add transaction history section (last 10 transactions)
 - [x] 4.6 Update sync progress to show all index values
 - [x] 4.7 Add "Export Full State" button for complete JSON dump
 - [x] 4.8 Style new sections with consistent design

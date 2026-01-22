@@ -65,6 +65,23 @@ const elements = {
   debugProverStatus: document.getElementById('debug-prover-status')!,
   debugTabs: document.querySelectorAll('.debug-tab'),
   tabContents: document.querySelectorAll('.tab-content'),
+  // Shielded tab elements
+  shieldedNotAvailable: document.getElementById('shielded-not-available')!,
+  shieldedContent: document.getElementById('shielded-content')!,
+  shieldedAddress: document.getElementById('shielded-address')!,
+  shieldedCoinCount: document.getElementById('shielded-coin-count')!,
+  shieldedBalances: document.getElementById('shielded-balances')!,
+  shieldedSyncProgress: document.getElementById('shielded-sync-progress')!,
+  // Unshielded tab elements
+  unshieldedNotAvailable: document.getElementById('unshielded-not-available')!,
+  unshieldedContent: document.getElementById('unshielded-content')!,
+  unshieldedBalance: document.getElementById('unshielded-balance')!,
+  unshieldedUtxoCount: document.getElementById('unshielded-utxo-count')!,
+  unshieldedRegistered: document.getElementById('unshielded-registered')!,
+  unshieldedSyncProgress: document.getElementById('unshielded-sync-progress')!,
+  // Transaction history
+  txHistorySection: document.getElementById('tx-history-section')!,
+  txHistoryList: document.getElementById('tx-history-list')!,
 };
 
 // State
@@ -586,6 +603,91 @@ async function updateDebugPanel(): Promise<void> {
       updateHealthIndicator(elements.debugNodeStatus, connectionStatus.node);
       updateHealthIndicator(elements.debugIndexerStatus, connectionStatus.indexer);
       updateHealthIndicator(elements.debugProverStatus, connectionStatus.prover);
+    }
+
+    // Update shielded tab
+    if (debugState?.shielded) {
+      elements.shieldedNotAvailable.classList.add('hidden');
+      elements.shieldedContent.classList.remove('hidden');
+
+      elements.shieldedAddress.textContent = debugState.shielded.address ?? '-';
+      elements.shieldedAddress.title = debugState.shielded.address ?? '';
+      elements.shieldedCoinCount.textContent = debugState.shielded.coinCount.toString();
+
+      // Render balances by token type
+      const balanceEntries = Object.entries(debugState.shielded.balances);
+      if (balanceEntries.length > 0) {
+        elements.shieldedBalances.innerHTML = balanceEntries
+          .map(([tokenType, amount]) => `
+            <div class="debug-value">
+              <span class="label">${tokenType}:</span>
+              <span>${formatNumber(amount)}</span>
+            </div>
+          `)
+          .join('');
+      } else {
+        elements.shieldedBalances.innerHTML = '<div class="placeholder-message"><span>No balances</span></div>';
+      }
+
+      // Update sync progress
+      if (debugState.shielded.syncProgress) {
+        const sp = debugState.shielded.syncProgress;
+        elements.shieldedSyncProgress.textContent = sp.isComplete
+          ? `Synced (${sp.appliedIndex})`
+          : `${sp.percentage}% (${sp.appliedIndex}/${sp.highestIndex})`;
+      } else {
+        elements.shieldedSyncProgress.textContent = '-';
+      }
+    } else {
+      elements.shieldedNotAvailable.classList.remove('hidden');
+      elements.shieldedContent.classList.add('hidden');
+    }
+
+    // Update unshielded tab
+    if (debugState?.unshielded) {
+      elements.unshieldedNotAvailable.classList.add('hidden');
+      elements.unshieldedContent.classList.remove('hidden');
+
+      elements.unshieldedBalance.textContent = formatNumber(debugState.unshielded.balance);
+      elements.unshieldedUtxoCount.textContent = debugState.unshielded.utxoCount.toString();
+      elements.unshieldedRegistered.textContent = debugState.unshielded.isRegistered ? 'Yes' : 'No';
+      elements.unshieldedRegistered.className = debugState.unshielded.isRegistered ? 'status-yes' : 'status-no';
+
+      // Update sync progress
+      if (debugState.unshielded.syncProgress) {
+        const sp = debugState.unshielded.syncProgress;
+        elements.unshieldedSyncProgress.textContent = sp.isComplete
+          ? `Synced (${sp.appliedIndex})`
+          : `${sp.percentage}% (${sp.appliedIndex}/${sp.highestIndex})`;
+      } else {
+        elements.unshieldedSyncProgress.textContent = '-';
+      }
+    } else {
+      elements.unshieldedNotAvailable.classList.remove('hidden');
+      elements.unshieldedContent.classList.add('hidden');
+    }
+
+    // Update transaction history
+    if (debugState?.recentTransactions && debugState.recentTransactions.length > 0) {
+      elements.txHistorySection.classList.remove('hidden');
+      elements.txHistoryList.innerHTML = debugState.recentTransactions
+        .slice(0, 10)
+        .map((tx) => `
+          <div class="tx-item ${tx.status}">
+            <div class="tx-header">
+              <span class="tx-type">${tx.type}</span>
+              <span class="tx-status">${tx.status}</span>
+            </div>
+            <div class="tx-details">
+              ${tx.amount ? `<span class="tx-amount">${formatNumber(tx.amount)} ${tx.tokenType ?? ''}</span>` : ''}
+              ${tx.timestamp ? `<span class="tx-time">${new Date(tx.timestamp).toLocaleString()}</span>` : ''}
+            </div>
+            <div class="tx-id truncate" title="${tx.id}">${tx.id}</div>
+          </div>
+        `)
+        .join('');
+    } else {
+      elements.txHistorySection.classList.add('hidden');
     }
   } catch (error) {
     console.error('[Lumen] Failed to update debug panel:', error);

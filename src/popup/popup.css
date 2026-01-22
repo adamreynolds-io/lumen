@@ -640,3 +640,101 @@ button.icon-btn:hover {
   padding: 8px;
   font-size: 12px;
 }
+
+/* Debug Subsections */
+.debug-subsection {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #2a2a3e;
+}
+
+.debug-subsection .debug-label {
+  font-size: 9px;
+  margin-bottom: 4px;
+}
+
+/* Balance List */
+.balance-list {
+  background: #1a1a2e;
+  border-radius: 4px;
+  padding: 4px 8px;
+}
+
+.balance-list .debug-value {
+  padding: 2px 0;
+}
+
+/* Registration Status */
+.status-yes {
+  color: #4caf50;
+}
+
+.status-no {
+  color: #666;
+}
+
+/* Transaction History */
+.tx-list {
+  max-height: 200px;
+  overflow-y: auto;
+  background: #1a1a2e;
+  border-radius: 4px;
+  padding: 4px;
+}
+
+.tx-item {
+  padding: 8px;
+  border-radius: 4px;
+  margin-bottom: 4px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.tx-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.tx-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.tx-type {
+  font-weight: 500;
+  text-transform: capitalize;
+  color: #aaa;
+}
+
+.tx-status {
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.tx-item.confirmed .tx-status {
+  color: #4caf50;
+}
+
+.tx-item.pending .tx-status {
+  color: #f0ad4e;
+}
+
+.tx-item.failed .tx-status {
+  color: #f44336;
+}
+
+.tx-details {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #888;
+}
+
+.tx-amount {
+  color: #667eea;
+}
+
+.tx-id {
+  font-size: 10px;
+  color: #555;
+  margin-top: 4px;
+}
