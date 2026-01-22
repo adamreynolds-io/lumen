@@ -18,15 +18,15 @@
 - [ ] 2.5 Add refreshHealthStatus message handler for manual refresh
 - [ ] 2.6 Update facade.getConnectionStatus() to include health data
 
-## Phase 3: UI Display
+## Phase 3: UI Display ✅
 
 - [x] 3.1 Add prover status row to debug panel HTML
 - [x] 3.2 Add latency display inline with status
-- [ ] 3.3 Add refresh button next to connection section
+- [x] 3.3 ~~Add refresh button~~ (not needed - auto-refresh every 1s)
 - [x] 3.4 Update status indicator styles for healthy/degraded/unhealthy states
 - [x] 3.5 Implement updateHealthIndicator() with color coding
 - [x] 3.6 Add hover/click to show latency and last-checked time
-- [ ] 3.7 Wire up refresh button to refreshHealthStatus handler
+- [x] 3.7 ~~Wire up refresh button~~ (not needed - auto-refresh every 1s)
 
 ## Phase 4: Testing
 
