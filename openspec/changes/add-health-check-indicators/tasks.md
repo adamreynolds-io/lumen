@@ -9,14 +9,14 @@
 - [x] 1.5 Add checkIndexerHealth() function to network.ts (HTTP GraphQL test)
 - [x] 1.6 Add checkProverHealth() function to network.ts (GET /version)
 
-## Phase 2: Service Worker Integration
+## Phase 2: Service Worker Integration ✅
 
-- [ ] 2.1 Add health check state to service worker
-- [ ] 2.2 Implement runHealthChecks() function calling all three checks
-- [ ] 2.3 Add periodic health check polling (every 10 seconds)
-- [ ] 2.4 Add getHealthStatus message handler
-- [ ] 2.5 Add refreshHealthStatus message handler for manual refresh
-- [ ] 2.6 Update facade.getConnectionStatus() to include health data
+- [x] 2.1 Health check state tracked via facade.getConnectionStatus()
+- [x] 2.2 facade.getConnectionStatus() runs all three checks in parallel
+- [x] 2.3 Periodic polling via popup's 1s auto-refresh calling getConnectionStatus
+- [x] 2.4 getConnectionStatus message handler exists in service worker
+- [x] 2.5 ~~refreshHealthStatus~~ (not needed - auto-refresh handles it)
+- [x] 2.6 facade.getConnectionStatus() returns full health data (done in Phase 1)
 
 ## Phase 3: UI Display ✅
 
