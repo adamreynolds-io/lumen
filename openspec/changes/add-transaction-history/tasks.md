@@ -16,14 +16,15 @@
 
 ## Phase 2: Implement Transaction Extraction
 
-- [x] 2.1 Add transaction extraction from ShieldedWallet state (if available)
-- [ ] 2.2 Add transaction extraction from UnshieldedWallet state (if available)
+- [x] 2.1 Add transaction extraction from ShieldedWallet state
+- [x] 2.2 Check UnshieldedWallet for transaction history - N/A (uses `TransactionHistoryService`, not array)
 - [x] 2.3 Map SDK transaction data to TransactionInfo interface
 - [x] 2.4 Update getDebugState() to return populated recentTransactions array
 - [x] 2.5 Limit to last 10 transactions, sorted by timestamp descending
 
 **Implementation:**
 - `extractTransactionHistory()` method in LumenFacade
+- Extracts from `ShieldedWalletState.transactionHistory` (FinalizedTransaction[])
 - Classifies transactions: transfer, swap, registration, unknown
 - Extracts amounts from transaction imbalances
 
