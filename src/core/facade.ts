@@ -565,6 +565,9 @@ export class LumenFacade {
       }
     }
 
+    // Extract transaction history from shielded wallet
+    const recentTransactions = await this.extractTransactionHistory();
+
     return {
       facadeStarted,
       syncProgress,
@@ -573,8 +576,100 @@ export class LumenFacade {
       facadeStartTime: this.startTime?.toISOString() ?? null,
       shielded,
       unshielded,
-      recentTransactions: [], // TODO: Implement transaction history extraction
+      recentTransactions,
     };
+  }
+
+  /**
+   * Extract transaction history from shielded wallet state.
+   * Returns up to 10 most recent transactions.
+   */
+  private async extractTransactionHistory(): Promise<TransactionInfo[]> {
+    if (!this.fullFacadeEnabled) {
+      return [];
+    }
+
+    const shieldedState = await this.getShieldedState();
+    if (!shieldedState) {
+      return [];
+    }
+
+    try {
+      // Access transaction history from shielded wallet state
+      const txHistory = shieldedState.transactionHistory;
+      if (!txHistory || txHistory.length === 0) {
+        return [];
+      }
+
+      const transactions: TransactionInfo[] = [];
+
+      // Process transactions (most recent first - take last 10)
+      const recentTxs = txHistory.slice(-10).reverse();
+
+      for (const tx of recentTxs) {
+        try {
+          // Get transaction hash as ID
+          const txHash = typeof tx.transactionHash === 'function'
+            ? tx.transactionHash()
+            : String(tx);
+
+          // Try to determine transaction type from structure
+          let txType: TransactionInfo['type'] = 'unknown';
+          let amount: string | null = null;
+          let tokenType: string | null = null;
+
+          // Check for rewards (registration-related)
+          if (tx.rewards) {
+            txType = 'registration';
+          }
+          // Check for intents (contract interactions, could be swaps)
+          else if (tx.intents && tx.intents.size > 0) {
+            txType = 'swap';
+          }
+          // Default to transfer for regular transactions
+          else {
+            txType = 'transfer';
+          }
+
+          // Try to extract amount from imbalances
+          try {
+            // Segment 0 is typically the guaranteed segment
+            const imbalances = typeof tx.imbalances === 'function'
+              ? tx.imbalances(0)
+              : null;
+
+            if (imbalances && imbalances.size > 0) {
+              // Get first non-zero imbalance
+              for (const [token, value] of imbalances.entries()) {
+                if (value !== 0n) {
+                  amount = (value < 0n ? -value : value).toString();
+                  tokenType = String(token);
+                  break;
+                }
+              }
+            }
+          } catch {
+            // Imbalances not available
+          }
+
+          transactions.push({
+            id: txHash,
+            type: txType,
+            timestamp: null, // Not available from transaction object
+            status: 'confirmed', // If it's in history, it's confirmed
+            amount,
+            tokenType,
+          });
+        } catch (err) {
+          console.warn('[Facade] Failed to process transaction:', err);
+        }
+      }
+
+      return transactions;
+    } catch (err) {
+      console.warn('[Facade] Failed to extract transaction history:', err);
+      return [];
+    }
   }
 
   /**
