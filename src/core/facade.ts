@@ -581,95 +581,124 @@ export class LumenFacade {
   }
 
   /**
-   * Extract transaction history from shielded wallet state.
-   * Returns up to 10 most recent transactions.
+   * Extract transaction history from shielded and unshielded wallet states.
+   * Returns up to 10 most recent transactions, sorted by timestamp.
    */
   private async extractTransactionHistory(): Promise<TransactionInfo[]> {
     if (!this.fullFacadeEnabled) {
       return [];
     }
 
-    const shieldedState = await this.getShieldedState();
-    if (!shieldedState) {
-      return [];
-    }
+    const transactions: TransactionInfo[] = [];
 
+    // Extract from shielded wallet
     try {
-      // Access transaction history from shielded wallet state
-      const txHistory = shieldedState.transactionHistory;
-      if (!txHistory || txHistory.length === 0) {
-        return [];
-      }
+      const shieldedState = await this.getShieldedState();
+      if (shieldedState?.transactionHistory?.length > 0) {
+        const recentTxs = shieldedState.transactionHistory.slice(-10).reverse();
 
-      const transactions: TransactionInfo[] = [];
-
-      // Process transactions (most recent first - take last 10)
-      const recentTxs = txHistory.slice(-10).reverse();
-
-      for (const tx of recentTxs) {
-        try {
-          // Get transaction hash as ID
-          const txHash = typeof tx.transactionHash === 'function'
-            ? tx.transactionHash()
-            : String(tx);
-
-          // Try to determine transaction type from structure
-          let txType: TransactionInfo['type'] = 'unknown';
-          let amount: string | null = null;
-          let tokenType: string | null = null;
-
-          // Check for rewards (registration-related)
-          if (tx.rewards) {
-            txType = 'registration';
-          }
-          // Check for intents (contract interactions, could be swaps)
-          else if (tx.intents && tx.intents.size > 0) {
-            txType = 'swap';
-          }
-          // Default to transfer for regular transactions
-          else {
-            txType = 'transfer';
-          }
-
-          // Try to extract amount from imbalances
+        for (const tx of recentTxs) {
           try {
-            // Segment 0 is typically the guaranteed segment
-            const imbalances = typeof tx.imbalances === 'function'
-              ? tx.imbalances(0)
-              : null;
+            const txHash = typeof tx.transactionHash === 'function'
+              ? tx.transactionHash()
+              : String(tx);
 
-            if (imbalances && imbalances.size > 0) {
-              // Get first non-zero imbalance
-              for (const [token, value] of imbalances.entries()) {
-                if (value !== 0n) {
-                  amount = (value < 0n ? -value : value).toString();
-                  tokenType = String(token);
-                  break;
+            let txType: TransactionInfo['type'] = 'unknown';
+            let amount: string | null = null;
+            let tokenType: string | null = null;
+
+            if (tx.rewards) {
+              txType = 'registration';
+            } else if (tx.intents && tx.intents.size > 0) {
+              txType = 'swap';
+            } else {
+              txType = 'transfer';
+            }
+
+            try {
+              const imbalances = typeof tx.imbalances === 'function' ? tx.imbalances(0) : null;
+              if (imbalances && imbalances.size > 0) {
+                for (const [token, value] of imbalances.entries()) {
+                  if (value !== 0n) {
+                    amount = (value < 0n ? -value : value).toString();
+                    tokenType = String(token);
+                    break;
+                  }
                 }
               }
+            } catch {
+              // Imbalances not available
             }
-          } catch {
-            // Imbalances not available
-          }
 
-          transactions.push({
-            id: txHash,
-            type: txType,
-            timestamp: null, // Not available from transaction object
-            status: 'confirmed', // If it's in history, it's confirmed
-            amount,
-            tokenType,
-          });
-        } catch (err) {
-          console.warn('[Facade] Failed to process transaction:', err);
+            transactions.push({
+              id: txHash,
+              type: txType,
+              timestamp: null,
+              status: 'confirmed',
+              amount,
+              tokenType,
+            });
+          } catch (err) {
+            console.warn('[Facade] Failed to process shielded transaction:', err);
+          }
         }
       }
-
-      return transactions;
     } catch (err) {
-      console.warn('[Facade] Failed to extract transaction history:', err);
-      return [];
+      console.warn('[Facade] Failed to extract shielded transaction history:', err);
     }
+
+    // Extract from unshielded wallet
+    try {
+      const unshieldedState = await this.getUnshieldedState();
+      if (unshieldedState?.transactionHistory) {
+        const txHistory = unshieldedState.transactionHistory;
+        // getAll() returns AsyncIterableIterator
+        if (typeof txHistory.getAll === 'function') {
+          const entries: Array<{
+            hash: string;
+            timestamp: Date;
+            status: 'SUCCESS' | 'FAILURE' | 'PARTIAL_SUCCESS';
+            fees: bigint | null;
+          }> = [];
+
+          // Collect entries from async iterator
+          for await (const entry of txHistory.getAll()) {
+            entries.push(entry);
+            if (entries.length >= 10) break; // Limit
+          }
+
+          for (const entry of entries) {
+            const statusMap: Record<string, TransactionInfo['status']> = {
+              'SUCCESS': 'confirmed',
+              'FAILURE': 'failed',
+              'PARTIAL_SUCCESS': 'confirmed',
+            };
+
+            transactions.push({
+              id: entry.hash,
+              type: 'transfer', // Unshielded are typically transfers
+              timestamp: entry.timestamp?.toISOString() ?? null,
+              status: statusMap[entry.status] ?? 'confirmed',
+              amount: entry.fees?.toString() ?? null,
+              tokenType: 'tDUST',
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[Facade] Failed to extract unshielded transaction history:', err);
+    }
+
+    // Sort by timestamp (if available), most recent first
+    transactions.sort((a, b) => {
+      if (!a.timestamp && !b.timestamp) return 0;
+      if (!a.timestamp) return 1;
+      if (!b.timestamp) return -1;
+      return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+    });
+
+    // Return up to 10
+    return transactions.slice(0, 10);
   }
 
   /**
