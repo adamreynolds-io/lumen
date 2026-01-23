@@ -823,13 +823,14 @@ button.icon-btn:hover {
 }
 
 .status-message {
+  display: block;
   font-size: 12px;
   text-align: center;
   width: 100%;
 }
 
 .status-message.hidden {
-  display: none;
+  display: none !important;
 }
 
 .status-message.success {

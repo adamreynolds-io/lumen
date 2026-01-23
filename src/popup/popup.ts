@@ -770,9 +770,12 @@ function toggleDebugPanel(): void {
 }
 
 // Copy debug info to clipboard
+// Icon SVGs for button states
+const ICON_DOWNLOAD = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+const ICON_CHECK = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+
 async function copyDebugInfo(): Promise<void> {
   const btn = elements.btnCopyDebug;
-  const originalHTML = btn.innerHTML;
 
   try {
     const state = await sendMessage('getState') as { hasWallet: boolean; address?: string; balance?: string; network?: string };
@@ -804,11 +807,14 @@ async function copyDebugInfo(): Promise<void> {
     await navigator.clipboard.writeText(JSON.stringify(debugInfo, null, 2));
 
     // Show checkmark on button
-    btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+    btn.innerHTML = ICON_CHECK;
     btn.style.background = '#4caf50';
 
+    // Show status message
+    showStatus('Copied to clipboard', 'success');
+
     setTimeout(() => {
-      btn.innerHTML = originalHTML;
+      btn.innerHTML = ICON_DOWNLOAD;
       btn.style.background = '';
     }, 1500);
   } catch (error) {
