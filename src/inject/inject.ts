@@ -8,7 +8,13 @@
  * See: https://github.com/midnightntwrk/midnight-dapp-connector-api
  */
 
-console.log('[Lumen] Injecting dapp-connector-api');
+// Conditional logging - disabled in production
+const IS_DEV = typeof process !== 'undefined' && process.env?.NODE_ENV !== 'production';
+function devLog(...args: unknown[]): void {
+  if (IS_DEV) console.log('[Lumen]', ...args);
+}
+
+devLog('Injecting dapp-connector-api');
 
 // ============================================
 // Types (aligned with @midnight-ntwrk/dapp-connector-api)
@@ -60,6 +66,7 @@ let messageId = 0;
 interface PendingRequest {
   resolve: (value: unknown) => void;
   reject: (error: Error) => void;
+  timeout: ReturnType<typeof setTimeout>;
 }
 
 const pendingRequests = new Map<number, PendingRequest>();
@@ -73,6 +80,8 @@ window.addEventListener('message', (event) => {
   const pending = pendingRequests.get(response.id);
 
   if (pending) {
+    // Clear timeout to prevent memory leak
+    clearTimeout(pending.timeout);
     pendingRequests.delete(response.id);
 
     if (response.payload?.error) {
@@ -103,7 +112,6 @@ function mapErrorCode(code?: string): ErrorCode {
 function sendRequest(method: string, params?: unknown): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const id = ++messageId;
-    pendingRequests.set(id, { resolve, reject });
 
     const request: LumenRequest = {
       type: 'LUMEN_REQUEST',
@@ -111,15 +119,17 @@ function sendRequest(method: string, params?: unknown): Promise<unknown> {
       payload: { method, params },
     };
 
-    window.postMessage(request, '*');
-
-    // Timeout after 30 seconds
-    setTimeout(() => {
+    // Set timeout and store handle to prevent memory leak
+    const timeout = setTimeout(() => {
       if (pendingRequests.has(id)) {
         pendingRequests.delete(id);
         reject(createAPIError(ErrorCodes.InternalError, `Request timeout: ${method}`));
       }
     }, 30000);
+
+    pendingRequests.set(id, { resolve, reject, timeout });
+
+    window.postMessage(request, window.location.origin);
   });
 }
 
@@ -407,7 +417,7 @@ if (!window.midnight) {
 // Register Lumen wallet under its UUID
 window.midnight[LUMEN_UUID] = lumenInitialAPI;
 
-console.log('[Lumen] dapp-connector-api ready:', LUMEN_UUID);
+devLog('dapp-connector-api ready');
 
 // Dispatch event to notify page that wallet is available
 window.dispatchEvent(new CustomEvent('midnight#ready', { detail: { uuid: LUMEN_UUID } }));

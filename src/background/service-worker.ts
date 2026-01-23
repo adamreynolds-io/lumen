@@ -52,15 +52,63 @@ import {
   type WalletKeys as FacadeWalletKeys,
 } from '../core/facade.js';
 
-console.log('[Lumen] Service worker starting...');
+// ============================================
+// Conditional Logging (disabled in production)
+// ============================================
 
-// Log any uncaught errors
+const IS_DEV = typeof process !== 'undefined' && process.env?.NODE_ENV !== 'production';
+
+/** Log only in development mode to prevent sensitive data exposure */
+function devLog(...args: unknown[]): void {
+  if (IS_DEV) {
+    console.log('[Lumen]', ...args);
+  }
+}
+
+devLog('Service worker starting...');
+
+// Flag to track if critical error occurred (triggers key wipe)
+let criticalErrorOccurred = false;
+
+/**
+ * Handle critical errors by wiping sensitive key material.
+ * Called on uncaught errors/rejections to prevent keys from persisting in corrupted state.
+ */
+function handleCriticalError(error: unknown): void {
+  console.error('[Lumen] Critical error - wiping keys for security:', error);
+  criticalErrorOccurred = true;
+
+  // Wipe keys immediately - use inline wipe since securelyWipeKeys may not be available yet
+  // This is a safety measure in case of early initialization errors
+  if (typeof currentKeys !== 'undefined' && currentKeys) {
+    try {
+      // Overwrite each key buffer with random data then zeros
+      const wipe = (data: Uint8Array | undefined) => {
+        if (data && data.length > 0) {
+          crypto.getRandomValues(data);
+          data.fill(0);
+        }
+      };
+      wipe(currentKeys.dustKey);
+      wipe(currentKeys.nightExternalKey);
+      wipe(currentKeys.nightInternalKey);
+    } catch {
+      // Ignore errors during emergency wipe
+    }
+    currentKeys = null;
+  }
+  if (typeof currentWalletInfo !== 'undefined') {
+    currentWalletInfo = null;
+  }
+}
+
+// Log and handle uncaught errors
 self.addEventListener('error', (event) => {
-  console.error('[Lumen] Uncaught error:', event.error);
+  handleCriticalError(event.error);
 });
 
 self.addEventListener('unhandledrejection', (event) => {
-  console.error('[Lumen] Unhandled rejection:', event.reason);
+  handleCriticalError(event.reason);
 });
 
 // ============================================
@@ -80,9 +128,13 @@ let currentWalletInfo: WalletInfo | null = null;
 // Wallet facade for SDK operations (balance queries, etc.)
 let facade: LumenFacade | null = null;
 
-// Balance polling interval
-let balancePollingInterval: ReturnType<typeof setInterval> | null = null;
-const BALANCE_POLL_INTERVAL_MS = 1000;
+// Balance polling state
+let balancePollingTimeout: ReturnType<typeof setTimeout> | null = null;
+const BALANCE_POLL_BASE_MS = 1000;      // Base polling interval
+const BALANCE_POLL_MAX_MS = 30000;      // Max backoff (30 seconds)
+const BALANCE_POLL_MAX_FAILURES = 10;   // Circuit breaker threshold
+let balancePollFailures = 0;
+let balancePollCurrentInterval = BALANCE_POLL_BASE_MS;
 
 // ============================================
 // Helpers
@@ -96,6 +148,115 @@ function requireWallet(): void {
   if (!walletState.hasWallet || !currentKeys) {
     throw new LumenError('No wallet loaded', 'NO_WALLET');
   }
+}
+
+/**
+ * Securely wipe sensitive data from a Uint8Array by overwriting with random values.
+ * This helps prevent memory forensics from recovering key material.
+ */
+function secureWipe(data: Uint8Array): void {
+  if (!data || data.length === 0) return;
+  // Overwrite with random data
+  crypto.getRandomValues(data);
+  // Then zero it out
+  data.fill(0);
+}
+
+/**
+ * Securely clear all key material from memory.
+ */
+function securelyWipeKeys(): void {
+  if (currentKeys) {
+    // Wipe each key buffer
+    if (currentKeys.dustKey) secureWipe(currentKeys.dustKey);
+    if (currentKeys.nightExternalKey) secureWipe(currentKeys.nightExternalKey);
+    if (currentKeys.nightInternalKey) secureWipe(currentKeys.nightInternalKey);
+    currentKeys = null;
+  }
+  currentWalletInfo = null;
+}
+
+/**
+ * Check if a message sender is the extension's popup (trusted context).
+ * Only popup should be able to call sensitive wallet management methods.
+ */
+function isPopupSender(sender: chrome.runtime.MessageSender): boolean {
+  // Popup has a URL like chrome-extension://<id>/popup.html
+  if (!sender.url) return false;
+  const extensionOrigin = `chrome-extension://${chrome.runtime.id}`;
+  return sender.url.startsWith(extensionOrigin);
+}
+
+/** Methods that should only be callable from the popup, not from dApps */
+const POPUP_ONLY_METHODS = [
+  'generateWallet',
+  'importFromSeed',
+  'importFromKey',
+  'importFromHexSeed',
+  'importLocalnetWallet',
+  'clearWallet',
+  'setNetwork',
+  'getDebugState',
+  'getCoins',
+];
+
+// ============================================
+// Rate Limiting
+// ============================================
+
+/** Rate limit config: max requests per window */
+const RATE_LIMIT_MAX_REQUESTS = 100;
+const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
+
+/** Track request timestamps per origin */
+const rateLimitMap = new Map<string, number[]>();
+
+/**
+ * Check if a request should be rate limited.
+ * Uses sliding window algorithm.
+ */
+function isRateLimited(origin: string): boolean {
+  const now = Date.now();
+  const windowStart = now - RATE_LIMIT_WINDOW_MS;
+
+  // Get or create request history for this origin
+  let requests = rateLimitMap.get(origin);
+  if (!requests) {
+    requests = [];
+    rateLimitMap.set(origin, requests);
+  }
+
+  // Remove old requests outside the window
+  requests = requests.filter((timestamp) => timestamp > windowStart);
+  rateLimitMap.set(origin, requests);
+
+  // Check if over limit
+  if (requests.length >= RATE_LIMIT_MAX_REQUESTS) {
+    return true;
+  }
+
+  // Record this request
+  requests.push(now);
+  return false;
+}
+
+/**
+ * Get origin identifier from sender.
+ * For popup, returns 'popup'. For content scripts, returns the tab's origin.
+ */
+function getSenderOrigin(sender: chrome.runtime.MessageSender): string {
+  if (isPopupSender(sender)) {
+    return 'popup'; // Popup is trusted, use fixed identifier
+  }
+  // For content scripts, use the tab's URL origin
+  if (sender.tab?.url) {
+    try {
+      return new URL(sender.tab.url).origin;
+    } catch {
+      return 'unknown';
+    }
+  }
+  return sender.origin || 'unknown';
 }
 
 function getNetworkId(): string {
@@ -117,43 +278,83 @@ function broadcastBalanceUpdate(balance: { total: string; available: string; pen
 }
 
 /**
- * Start polling for balance updates.
+ * Schedule next balance poll with current interval.
+ */
+function scheduleNextPoll(): void {
+  if (balancePollingTimeout) {
+    clearTimeout(balancePollingTimeout);
+  }
+  balancePollingTimeout = setTimeout(pollBalance, balancePollCurrentInterval);
+}
+
+/**
+ * Poll balance once and schedule next poll.
+ * Uses exponential backoff on errors, resets on success.
+ */
+async function pollBalance(): Promise<void> {
+  if (!facade) {
+    // No facade, stop polling
+    return;
+  }
+
+  // Circuit breaker: stop polling after too many consecutive failures
+  if (balancePollFailures >= BALANCE_POLL_MAX_FAILURES) {
+    devLog('Balance polling circuit breaker triggered - stopping');
+    return;
+  }
+
+  try {
+    const balance = await facade.getBalanceNonBlocking();
+    if (balance) {
+      const balanceStr = {
+        total: balance.total.toString(),
+        available: balance.available.toString(),
+        pending: balance.pending.toString(),
+      };
+
+      // Update wallet state
+      walletState.balance = balanceStr.total;
+
+      // Broadcast to popup
+      broadcastBalanceUpdate(balanceStr);
+
+      // Success: reset backoff
+      balancePollFailures = 0;
+      balancePollCurrentInterval = BALANCE_POLL_BASE_MS;
+    }
+  } catch (e) {
+    // Error: apply exponential backoff
+    balancePollFailures++;
+    balancePollCurrentInterval = Math.min(
+      balancePollCurrentInterval * 2,
+      BALANCE_POLL_MAX_MS
+    );
+  }
+
+  // Schedule next poll
+  scheduleNextPoll();
+}
+
+/**
+ * Start polling for balance updates with exponential backoff.
  */
 function startBalancePolling(): void {
-  // Clear any existing interval
+  // Reset state
   stopBalancePolling();
+  balancePollFailures = 0;
+  balancePollCurrentInterval = BALANCE_POLL_BASE_MS;
 
-  balancePollingInterval = setInterval(async () => {
-    if (!facade) return;
-
-    try {
-      const balance = await facade.getBalanceNonBlocking();
-      if (balance) {
-        const balanceStr = {
-          total: balance.total.toString(),
-          available: balance.available.toString(),
-          pending: balance.pending.toString(),
-        };
-
-        // Update wallet state
-        walletState.balance = balanceStr.total;
-
-        // Broadcast to popup
-        broadcastBalanceUpdate(balanceStr);
-      }
-    } catch (e) {
-      // Silently ignore polling errors
-    }
-  }, BALANCE_POLL_INTERVAL_MS);
+  // Start polling
+  scheduleNextPoll();
 }
 
 /**
  * Stop balance polling.
  */
 function stopBalancePolling(): void {
-  if (balancePollingInterval) {
-    clearInterval(balancePollingInterval);
-    balancePollingInterval = null;
+  if (balancePollingTimeout) {
+    clearTimeout(balancePollingTimeout);
+    balancePollingTimeout = null;
   }
 }
 
@@ -205,7 +406,7 @@ async function initializeFacade(): Promise<void> {
   try {
     // Enable full WalletFacade mode (ShieldedWallet + UnshieldedWallet + DustWallet)
     await facade.start(true);
-    console.log('[Lumen] Full WalletFacade initialized and syncing');
+    devLog(' Full WalletFacade initialized and syncing');
 
     // Start balance polling
     startBalancePolling();
@@ -246,7 +447,7 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
     walletState.address = result.data.info.address;
     walletState.balance = '0';
 
-    console.log('[Lumen] Wallet generated:', result.data.info.address);
+    devLog(' Wallet generated:', result.data.info.address);
 
     // Initialize facade and start balance polling
     await initializeFacade();
@@ -272,7 +473,7 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
     walletState.address = result.data.info.address;
     walletState.balance = '0';
 
-    console.log('[Lumen] Wallet imported from seed:', result.data.info.address);
+    devLog(' Wallet imported from seed:', result.data.info.address);
 
     // Initialize facade and start balance polling
     await initializeFacade();
@@ -298,7 +499,7 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
     walletState.address = result.data.info.address;
     walletState.balance = '0';
 
-    console.log('[Lumen] Wallet imported from key:', result.data.info.address);
+    devLog(' Wallet imported from key:', result.data.info.address);
 
     // Initialize facade and start balance polling
     await initializeFacade();
@@ -316,7 +517,7 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
 
   // Import a prefunded localnet wallet
   importLocalnetWallet: async (params: { walletName: string }) => {
-    console.log('[Lumen] importLocalnetWallet called with:', params);
+    devLog(' importLocalnetWallet called with:', params);
     const { walletName } = params;
     const seed = LOCALNET_SEEDS[walletName];
 
@@ -327,7 +528,7 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
       );
     }
 
-    console.log('[Lumen] Found seed for', walletName, '- calling importFromHexSeed');
+    devLog(' Found seed for', walletName, '- calling importFromHexSeed');
     const networkId = getNetworkId();
 
     let result;
@@ -350,7 +551,7 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
     walletState.address = result.data.info.address;
     walletState.balance = '0';
 
-    console.log('[Lumen] Localnet wallet imported:', walletName, result.data.info.address);
+    devLog(' Localnet wallet imported:', walletName, result.data.info.address);
 
     // Initialize facade and start balance polling
     await initializeFacade();
@@ -376,7 +577,7 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
     walletState.address = result.data.info.address;
     walletState.balance = '0';
 
-    console.log('[Lumen] Wallet imported from hex seed:', result.data.info.address);
+    devLog(' Wallet imported from hex seed:', result.data.info.address);
 
     // Initialize facade and start balance polling
     await initializeFacade();
@@ -386,27 +587,33 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
 
   // Clear wallet
   clearWallet: async () => {
-    // Stop balance polling and facade
-    stopBalancePolling();
-    if (facade) {
-      try {
-        await facade.stop();
-      } catch (e) {
-        console.warn('[Lumen] Failed to stop facade:', e);
+    // Use try-finally to ensure keys are ALWAYS wiped, even if facade.stop() fails
+    try {
+      // Stop balance polling first
+      stopBalancePolling();
+
+      // Try to stop facade gracefully
+      if (facade) {
+        try {
+          await facade.stop();
+        } catch (e) {
+          // Log but continue with cleanup
+          if (IS_DEV) console.warn('[Lumen] Failed to stop facade:', e);
+        }
       }
+    } finally {
+      // ALWAYS wipe keys, regardless of any errors above
       facade = null;
+      securelyWipeKeys();
+
+      walletState = {
+        hasWallet: false,
+        network: walletState.network,
+        customRpcUrl: walletState.customRpcUrl,
+      };
     }
 
-    currentKeys = null;
-    currentWalletInfo = null;
-
-    walletState = {
-      hasWallet: false,
-      network: walletState.network,
-      customRpcUrl: walletState.customRpcUrl,
-    };
-
-    console.log('[Lumen] Wallet cleared');
+    devLog('Wallet cleared');
 
     return { success: true };
   },
@@ -438,7 +645,7 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
 
     // Reinitialize facade if wallet exists and network changed
     if (currentKeys && previousNetwork !== params.network) {
-      console.log('[Lumen] Network changed to:', params.network, '- reinitializing facade');
+      devLog(' Network changed to:', params.network, '- reinitializing facade');
       await initializeFacade();
     }
 
@@ -449,14 +656,14 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
   testConnection: async (): Promise<NetworkStatus> => {
     const rpcUrl = getRpcUrl(walletState.network, walletState.customUrls?.nodeUrl);
 
-    console.log('[Lumen] Testing connection to:', rpcUrl);
+    devLog(' Testing connection to:', rpcUrl);
 
     const status = await networkTestConnection(rpcUrl);
 
     if (status.connected) {
-      console.log('[Lumen] Connected to:', status.chainInfo?.name, 'at block', status.blockHeight);
+      devLog(' Connected to:', status.chainInfo?.name, 'at block', status.blockHeight);
     } else {
-      console.log('[Lumen] Connection failed:', status.error);
+      devLog(' Connection failed:', status.error);
     }
 
     return status;
@@ -482,7 +689,7 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
     }
 
     if (!facade) {
-      console.log('[Lumen] Facade not available, returning 0 balance');
+      devLog(' Facade not available, returning 0 balance');
       return { total: '0', available: '0', pending: '0' };
     }
 
@@ -490,7 +697,7 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
       const balance = await facade.getBalance();
       walletState.balance = balance.total.toString();
 
-      console.log('[Lumen] Balance refreshed via facade:', balance.total.toString());
+      devLog(' Balance refreshed via facade:', balance.total.toString());
 
       return {
         total: balance.total.toString(),
@@ -547,7 +754,7 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
       throw new LumenError(result.error, 'UNKNOWN_ERROR');
     }
 
-    console.log('[Lumen] Transaction signed');
+    devLog(' Transaction signed');
 
     return result.data;
   },
@@ -562,7 +769,7 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
       throw new LumenError(result.error, 'UNKNOWN_ERROR');
     }
 
-    console.log('[Lumen] Message signed:', params.message.slice(0, 20) + '...');
+    devLog(' Message signed:', params.message.slice(0, 20) + '...');
 
     return result.data;
   },
@@ -575,8 +782,8 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
 
     // TODO: Implement actual transaction submission using @polkadot/api
     // For now, log and return success (developer wallet is for testing)
-    console.log('[Lumen] Transaction submitted to:', urls.nodeUrl);
-    console.log('[Lumen] Transaction data:', params.tx.slice(0, 50) + '...');
+    devLog(' Transaction submitted to:', urls.nodeUrl);
+    devLog(' Transaction data:', params.tx.slice(0, 50) + '...');
 
     return { success: true };
   },
@@ -645,9 +852,21 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
 // Message Listener
 // ============================================
 
-chrome.runtime.onMessage.addListener((request: LumenRequest, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((request: LumenRequest, sender, sendResponse) => {
   const { method, params } = request;
-  console.log('[Lumen] Received message:', method);
+
+  // Security: Check if method requires popup-only access
+  if (POPUP_ONLY_METHODS.includes(method) && !isPopupSender(sender)) {
+    sendResponse(errorResponse('This method is only available from the extension popup', 'UNAUTHORIZED'));
+    return true;
+  }
+
+  // Security: Rate limiting for non-popup requests
+  const senderOrigin = getSenderOrigin(sender);
+  if (senderOrigin !== 'popup' && isRateLimited(senderOrigin)) {
+    sendResponse(errorResponse('Rate limit exceeded. Please try again later.', 'UNKNOWN_ERROR'));
+    return true;
+  }
 
   const handler = handlers[method];
   if (!handler) {
@@ -690,7 +909,7 @@ async function initializeState(): Promise<void> {
     walletState.network = networkConfig.networkId;
     walletState.customRpcUrl = networkConfig.customRpcUrl;
 
-    console.log('[Lumen] Loaded network config:', networkConfig.networkId);
+    devLog(' Loaded network config:', networkConfig.networkId);
   } catch (error) {
     console.error('[Lumen] Failed to load network config:', error);
   }
@@ -704,9 +923,9 @@ initializeState();
 // ============================================
 
 chrome.runtime.onInstalled.addListener(async () => {
-  console.log('[Lumen] Extension installed');
+  devLog(' Extension installed');
   // Set default network on first install
   await saveNetworkConfig('devnet');
 });
 
-console.log('[Lumen] Service worker ready');
+devLog(' Service worker ready');

@@ -112,7 +112,7 @@ export function sendToContentScript(
       payload: { method, params },
     };
 
-    window.postMessage(message, '*');
+    window.postMessage(message, window.location.origin);
   });
 }
 
@@ -160,7 +160,7 @@ export function sendToInjectScript(
     id,
     payload,
   };
-  window.postMessage(message, '*');
+  window.postMessage(message, window.location.origin);
 }
 
 // ============================================
@@ -191,7 +191,7 @@ export function sendToServiceWorker(
 // Debug Logging
 // ============================================
 
-const DEBUG = true;
+const DEBUG = typeof process !== 'undefined' && process.env?.NODE_ENV !== 'production';
 
 export function logMessage(
   direction: 'send' | 'receive',

@@ -7,6 +7,20 @@
 
 console.log('[Lumen] Popup loaded');
 
+// ============================================
+// Security: HTML Escaping
+// ============================================
+
+/** Escape HTML to prevent XSS attacks from blockchain data */
+function escapeHtml(unsafe: string): string {
+  return unsafe
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 // DOM Elements
 const elements = {
   // Sections
@@ -562,7 +576,11 @@ async function updateDebugPanel(): Promise<void> {
         });
       });
     } else {
-      elements.debugCoinList.innerHTML = '<span class="empty">No coins</span>';
+      elements.debugCoinList.textContent = '';
+      const empty = document.createElement('span');
+      empty.className = 'empty';
+      empty.textContent = 'No coins';
+      elements.debugCoinList.appendChild(empty);
     }
 
     // Update status bar health indicators
@@ -581,19 +599,23 @@ async function updateDebugPanel(): Promise<void> {
       elements.shieldedAddress.title = debugState.shielded.address ?? '';
       elements.shieldedCoinCount.textContent = debugState.shielded.coinCount.toString();
 
-      // Render balances by token type
+      // Render balances by token type (with XSS protection)
       const balanceEntries = Object.entries(debugState.shielded.balances);
       if (balanceEntries.length > 0) {
         elements.shieldedBalances.innerHTML = balanceEntries
           .map(([tokenType, amount]) => `
             <div class="debug-value">
-              <span class="label">${tokenType}:</span>
-              <span>${formatNumber(amount)}</span>
+              <span class="label">${escapeHtml(tokenType)}:</span>
+              <span>${escapeHtml(formatNumber(amount))}</span>
             </div>
           `)
           .join('');
       } else {
-        elements.shieldedBalances.innerHTML = '<div class="placeholder-message"><span>No balances</span></div>';
+        elements.shieldedBalances.textContent = '';
+        const placeholder = document.createElement('div');
+        placeholder.className = 'placeholder-message';
+        placeholder.textContent = 'No balances';
+        elements.shieldedBalances.appendChild(placeholder);
       }
 
       // Update sync progress
@@ -634,26 +656,39 @@ async function updateDebugPanel(): Promise<void> {
       elements.unshieldedContent.classList.add('hidden');
     }
 
-    // Update transaction history tab
+    // Update transaction history tab (with XSS protection)
     if (debugState?.recentTransactions && debugState.recentTransactions.length > 0) {
       elements.txHistoryList.innerHTML = debugState.recentTransactions
         .slice(0, 10)
-        .map((tx) => `
-          <div class="tx-item ${tx.status}">
-            <div class="tx-header">
-              <span class="tx-type">${tx.type}</span>
-              <span class="tx-status">${tx.status}</span>
+        .map((tx) => {
+          const safeStatus = escapeHtml(tx.status);
+          const safeType = escapeHtml(tx.type);
+          const safeId = escapeHtml(tx.id);
+          const safeAmount = tx.amount ? escapeHtml(formatNumber(tx.amount)) : '';
+          const safeTokenType = tx.tokenType ? escapeHtml(tx.tokenType) : '';
+          const safeTime = tx.timestamp ? escapeHtml(new Date(tx.timestamp).toLocaleString()) : '';
+
+          return `
+            <div class="tx-item ${safeStatus}">
+              <div class="tx-header">
+                <span class="tx-type">${safeType}</span>
+                <span class="tx-status">${safeStatus}</span>
+              </div>
+              <div class="tx-details">
+                ${safeAmount ? `<span class="tx-amount">${safeAmount} ${safeTokenType}</span>` : ''}
+                ${safeTime ? `<span class="tx-time">${safeTime}</span>` : ''}
+              </div>
+              <div class="tx-id truncate" title="${safeId}">${safeId}</div>
             </div>
-            <div class="tx-details">
-              ${tx.amount ? `<span class="tx-amount">${formatNumber(tx.amount)} ${tx.tokenType ?? ''}</span>` : ''}
-              ${tx.timestamp ? `<span class="tx-time">${new Date(tx.timestamp).toLocaleString()}</span>` : ''}
-            </div>
-            <div class="tx-id truncate" title="${tx.id}">${tx.id}</div>
-          </div>
-        `)
+          `;
+        })
         .join('');
     } else {
-      elements.txHistoryList.innerHTML = '<div class="placeholder-message"><span>No transactions</span></div>';
+      elements.txHistoryList.textContent = '';
+      const placeholder = document.createElement('div');
+      placeholder.className = 'placeholder-message';
+      placeholder.textContent = 'No transactions';
+      elements.txHistoryList.appendChild(placeholder);
     }
   } catch (error) {
     console.error('[Lumen] Failed to update debug panel:', error);
@@ -661,22 +696,32 @@ async function updateDebugPanel(): Promise<void> {
 }
 
 // Render a single coin item with expandable details
+// Render a single coin item with XSS protection
 function renderCoinItem(coin: CoinInfo, index: number): string {
   const statusClass = coin.status === 'spendable' ? 'spendable' : 'pending';
-  const value = formatNumber(coin.value);
+  const safeValue = escapeHtml(formatNumber(coin.value));
+  const safeStatus = escapeHtml(coin.status);
 
   // Format creation time
   const createdAt = coin.createdAt
-    ? new Date(coin.createdAt).toLocaleString()
+    ? escapeHtml(new Date(coin.createdAt).toLocaleString())
     : 'Unknown';
+
+  const safeSeq = coin.sequenceNumber !== null ? escapeHtml(String(coin.sequenceNumber)) : '-';
+  const safeMtIndex = coin.merkleTreeIndex ? escapeHtml(coin.merkleTreeIndex) : '-';
+  const safeNonce = coin.backingNightNonce ? escapeHtml(coin.backingNightNonce) : '-';
 
   // Format generation info
   let generationHtml = '';
   if (coin.generation) {
     const gen = coin.generation;
     const genTime = gen.generationTime
-      ? new Date(gen.generationTime).toLocaleString()
+      ? escapeHtml(new Date(gen.generationTime).toLocaleString())
       : 'Not started';
+    const safeGenerated = escapeHtml(formatNumber(gen.currentlyGenerated));
+    const safeMaxCap = escapeHtml(formatNumber(gen.maxCapacity));
+    const safeRate = escapeHtml(formatNumber(gen.rate));
+
     generationHtml = `
       <div class="coin-detail">
         <span class="label">Generation:</span>
@@ -684,11 +729,11 @@ function renderCoinItem(coin: CoinInfo, index: number): string {
       </div>
       <div class="coin-detail">
         <span class="label">Generated:</span>
-        <span>${formatNumber(gen.currentlyGenerated)} / ${formatNumber(gen.maxCapacity)}</span>
+        <span>${safeGenerated} / ${safeMaxCap}</span>
       </div>
       <div class="coin-detail">
         <span class="label">Rate:</span>
-        <span>${formatNumber(gen.rate)}/block</span>
+        <span>${safeRate}/block</span>
       </div>
     `;
   }
@@ -696,8 +741,8 @@ function renderCoinItem(coin: CoinInfo, index: number): string {
   return `
     <div class="coin-item ${statusClass}" data-index="${index}">
       <div class="coin-header">
-        <span class="coin-value">${value}</span>
-        <span class="coin-status">${coin.status}</span>
+        <span class="coin-value">${safeValue}</span>
+        <span class="coin-status">${safeStatus}</span>
         <span class="coin-expand">▶</span>
       </div>
       <div class="coin-details">
@@ -707,15 +752,15 @@ function renderCoinItem(coin: CoinInfo, index: number): string {
         </div>
         <div class="coin-detail">
           <span class="label">Seq:</span>
-          <span>${coin.sequenceNumber ?? '-'}</span>
+          <span>${safeSeq}</span>
         </div>
         <div class="coin-detail">
           <span class="label">MT Index:</span>
-          <span>${coin.merkleTreeIndex ?? '-'}</span>
+          <span>${safeMtIndex}</span>
         </div>
         <div class="coin-detail">
           <span class="label">Backing NIGHT:</span>
-          <span class="truncate">${coin.backingNightNonce ?? '-'}</span>
+          <span class="truncate">${safeNonce}</span>
         </div>
         ${generationHtml}
       </div>
@@ -777,6 +822,18 @@ const ICON_CHECK = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" 
 async function copyDebugInfo(): Promise<void> {
   const btn = elements.btnCopyDebug;
 
+  // Security: Warn user before copying sensitive wallet info
+  const confirmed = confirm(
+    'This will copy wallet debug info to your clipboard.\n\n' +
+    'Warning: This includes your wallet address and balance.\n' +
+    'Only share this information with trusted parties.\n\n' +
+    'Continue?'
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
   try {
     const state = await sendMessage('getState') as { hasWallet: boolean; address?: string; balance?: string; network?: string };
 
@@ -793,14 +850,28 @@ async function copyDebugInfo(): Promise<void> {
       // Detailed state unavailable
     }
 
+    // Redact sensitive coin data (keep counts but remove specific identifiers)
+    const redactedCoins = coins.map((coin, index) => ({
+      index,
+      value: coin.value,
+      status: coin.status,
+      tokenType: coin.tokenType,
+      // Redact specific identifiers
+      id: '[redacted]',
+    }));
+
     const debugInfo = {
       timestamp: new Date().toISOString(),
       hasWallet: state.hasWallet,
       address: state.address,
       balance: state.balance,
       network: state.network,
-      debugState,
-      coins,
+      debugState: debugState ? {
+        ...debugState,
+        // Keep summary info, no sensitive keys
+      } : null,
+      coinCount: coins.length,
+      coins: redactedCoins,
       connectionStatus,
     };
 

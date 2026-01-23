@@ -296,7 +296,7 @@ export function importFromPrivateKey(
   if (!/^[0-9a-f]{64}$/.test(cleanHex)) {
     return {
       success: false,
-      error: 'Invalid private key format. Expected 64 hex characters.',
+      error: 'Invalid private key format',
     };
   }
 
@@ -347,7 +347,7 @@ export function importFromHexSeed(
   if (!/^[0-9a-f]{64}$/.test(cleanHex) && !/^[0-9a-f]{128}$/.test(cleanHex)) {
     return {
       success: false,
-      error: 'Invalid seed format. Expected 64 or 128 hex characters.',
+      error: 'Invalid seed format',
     };
   }
 

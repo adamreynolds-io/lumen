@@ -98,6 +98,8 @@ export type ErrorCode =
   | 'INVALID_TX'
   | 'USER_REJECTED'
   | 'INVALID_INPUT'
+  | 'UNAUTHORIZED'
+  | 'NOT_CONNECTED'
   | 'UNKNOWN_ERROR';
 
 export class LumenError extends Error {

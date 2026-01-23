@@ -67,7 +67,42 @@ export interface HealthCheckResult {
 const STORAGE_KEYS = {
   NETWORK_ID: 'lumen_network_id',
   CUSTOM_RPC_URL: 'lumen_custom_rpc_url',
+  CONFIG_CHECKSUM: 'lumen_config_checksum',
 } as const;
+
+// ============================================
+// Integrity Verification
+// ============================================
+
+/**
+ * Compute a SHA-256 checksum for network config data.
+ * Uses extension ID as salt to prevent cross-extension tampering.
+ */
+async function computeConfigChecksum(networkId: string, customRpcUrl?: string): Promise<string> {
+  const extensionId = chrome.runtime?.id || 'lumen-wallet';
+  const data = `${extensionId}:${networkId}:${customRpcUrl || ''}`;
+
+  const encoder = new TextEncoder();
+  const buffer = encoder.encode(data);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+
+  // Convert to hex string
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Verify network config integrity.
+ * Returns true if checksum matches, false otherwise.
+ */
+async function verifyConfigIntegrity(
+  networkId: string,
+  customRpcUrl: string | undefined,
+  storedChecksum: string
+): Promise<boolean> {
+  const computedChecksum = await computeConfigChecksum(networkId, customRpcUrl);
+  return computedChecksum === storedChecksum;
+}
 
 // ============================================
 // API Connection Cache
@@ -250,11 +285,15 @@ export async function queryBalance(
 // ============================================
 
 /**
- * Save network configuration to chrome.storage.
+ * Save network configuration to chrome.storage with integrity checksum.
  */
 export async function saveNetworkConfig(networkId: NetworkId, customRpcUrl?: string): Promise<void> {
+  // Compute integrity checksum
+  const checksum = await computeConfigChecksum(networkId, customRpcUrl);
+
   const data: Record<string, string> = {
     [STORAGE_KEYS.NETWORK_ID]: networkId,
+    [STORAGE_KEYS.CONFIG_CHECKSUM]: checksum,
   };
 
   if (customRpcUrl) {
@@ -265,17 +304,43 @@ export async function saveNetworkConfig(networkId: NetworkId, customRpcUrl?: str
 }
 
 /**
- * Load network configuration from chrome.storage.
+ * Load network configuration from chrome.storage with integrity verification.
+ * Falls back to safe defaults if integrity check fails.
  */
 export async function loadNetworkConfig(): Promise<{
   networkId: NetworkId;
   customRpcUrl?: string;
 }> {
-  const data = await chrome.storage.local.get([STORAGE_KEYS.NETWORK_ID, STORAGE_KEYS.CUSTOM_RPC_URL]);
+  const data = await chrome.storage.local.get([
+    STORAGE_KEYS.NETWORK_ID,
+    STORAGE_KEYS.CUSTOM_RPC_URL,
+    STORAGE_KEYS.CONFIG_CHECKSUM,
+  ]);
+
+  const networkId = data[STORAGE_KEYS.NETWORK_ID] as NetworkId | undefined;
+  const customRpcUrl = data[STORAGE_KEYS.CUSTOM_RPC_URL] as string | undefined;
+  const storedChecksum = data[STORAGE_KEYS.CONFIG_CHECKSUM] as string | undefined;
+
+  // If no config stored, return defaults
+  if (!networkId) {
+    return { networkId: 'devnet' };
+  }
+
+  // Verify integrity if checksum exists
+  if (storedChecksum) {
+    const isValid = await verifyConfigIntegrity(networkId, customRpcUrl, storedChecksum);
+    if (!isValid) {
+      // Integrity check failed - possible tampering
+      // Clear the compromised config and return safe defaults
+      console.warn('[Lumen] Network config integrity check failed - resetting to defaults');
+      await clearNetworkConfig();
+      return { networkId: 'devnet' };
+    }
+  }
 
   return {
-    networkId: (data[STORAGE_KEYS.NETWORK_ID] as NetworkId) || 'devnet',
-    customRpcUrl: data[STORAGE_KEYS.CUSTOM_RPC_URL],
+    networkId: networkId || 'devnet',
+    customRpcUrl,
   };
 }
 
@@ -283,7 +348,11 @@ export async function loadNetworkConfig(): Promise<{
  * Clear network configuration from chrome.storage.
  */
 export async function clearNetworkConfig(): Promise<void> {
-  await chrome.storage.local.remove([STORAGE_KEYS.NETWORK_ID, STORAGE_KEYS.CUSTOM_RPC_URL]);
+  await chrome.storage.local.remove([
+    STORAGE_KEYS.NETWORK_ID,
+    STORAGE_KEYS.CUSTOM_RPC_URL,
+    STORAGE_KEYS.CONFIG_CHECKSUM,
+  ]);
 }
 
 // ============================================
@@ -304,18 +373,79 @@ export function getNetworkPreset(networkId: Exclude<NetworkId, 'custom'>): Netwo
   return NETWORKS[networkId];
 }
 
+/** Maximum allowed URL length */
+const MAX_URL_LENGTH = 2048;
+
+/** Private/internal IP patterns that should be blocked in production */
+const PRIVATE_IP_PATTERNS = [
+  /^127\./,                    // Loopback
+  /^10\./,                     // Class A private
+  /^172\.(1[6-9]|2[0-9]|3[01])\./, // Class B private
+  /^192\.168\./,               // Class C private
+  /^169\.254\./,               // Link-local
+  /^0\./,                      // Current network
+  /^::1$/,                     // IPv6 loopback
+  /^fc00:/i,                   // IPv6 unique local
+  /^fe80:/i,                   // IPv6 link-local
+];
+
+/** Hostnames that should be blocked */
+const BLOCKED_HOSTNAMES = ['localhost', 'localhost.localdomain'];
+
+/**
+ * Check if a hostname is a private/internal address.
+ * Note: For development, localhost is allowed when network is 'localnet'.
+ */
+function isPrivateHost(hostname: string): boolean {
+  const lowerHost = hostname.toLowerCase();
+
+  // Check blocked hostnames
+  if (BLOCKED_HOSTNAMES.includes(lowerHost)) {
+    return true;
+  }
+
+  // Check IP patterns
+  for (const pattern of PRIVATE_IP_PATTERNS) {
+    if (pattern.test(hostname)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 /**
  * Validate a custom RPC URL.
+ * Checks protocol, URL length, and optionally blocks private IPs.
+ * @param url - The URL to validate
+ * @param allowPrivate - Whether to allow private/localhost addresses (default: true for dev wallet)
  */
-export function isValidRpcUrl(url: string): boolean {
+export function isValidRpcUrl(url: string, allowPrivate = true): boolean {
   try {
+    // Check URL length
+    if (url.length > MAX_URL_LENGTH) {
+      return false;
+    }
+
     const parsed = new URL(url);
-    return (
+
+    // Check protocol
+    const validProtocol =
       parsed.protocol === 'http:' ||
       parsed.protocol === 'https:' ||
       parsed.protocol === 'ws:' ||
-      parsed.protocol === 'wss:'
-    );
+      parsed.protocol === 'wss:';
+
+    if (!validProtocol) {
+      return false;
+    }
+
+    // Check for private IPs (if not allowed)
+    if (!allowPrivate && isPrivateHost(parsed.hostname)) {
+      return false;
+    }
+
+    return true;
   } catch {
     return false;
   }
@@ -326,9 +456,66 @@ export function isValidRpcUrl(url: string): boolean {
 // ============================================
 
 const HEALTH_CHECK_TIMEOUT = 5000;
+const MAX_RESPONSE_SIZE = 1024 * 100; // 100KB max response size
+
+/**
+ * Fetch with response size limit to prevent slow-loris and large payload attacks.
+ * Reads the response in chunks and aborts if size exceeds limit.
+ */
+async function safeFetch(
+  url: string,
+  options: RequestInit,
+  maxSize = MAX_RESPONSE_SIZE
+): Promise<{ ok: boolean; status: number; text: () => Promise<string>; json: () => Promise<unknown> }> {
+  const response = await fetch(url, options);
+
+  // Check Content-Length header if available
+  const contentLength = response.headers.get('content-length');
+  if (contentLength && parseInt(contentLength, 10) > maxSize) {
+    throw new Error(`Response too large: ${contentLength} bytes`);
+  }
+
+  // Read response with size limit
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error('No response body');
+  }
+
+  const chunks: Uint8Array[] = [];
+  let totalSize = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    totalSize += value.length;
+    if (totalSize > maxSize) {
+      reader.cancel();
+      throw new Error(`Response exceeded size limit of ${maxSize} bytes`);
+    }
+    chunks.push(value);
+  }
+
+  // Combine chunks into text
+  const combined = new Uint8Array(totalSize);
+  let offset = 0;
+  for (const chunk of chunks) {
+    combined.set(chunk, offset);
+    offset += chunk.length;
+  }
+  const text = new TextDecoder().decode(combined);
+
+  return {
+    ok: response.ok,
+    status: response.status,
+    text: async () => text,
+    json: async () => JSON.parse(text),
+  };
+}
 
 /**
  * Check node health via /health endpoint and RPC call.
+ * Uses safeFetch to limit response sizes.
  */
 export async function checkNodeHealth(nodeUrl: string): Promise<HealthCheckResult> {
   const startTime = Date.now();
@@ -339,8 +526,8 @@ export async function checkNodeHealth(nodeUrl: string): Promise<HealthCheckResul
       .replace('wss://', 'https://')
       .replace('ws://', 'http://');
 
-    // Check /health endpoint
-    const healthResponse = await fetch(`${httpUrl}/health`, {
+    // Check /health endpoint with size limit
+    const healthResponse = await safeFetch(`${httpUrl}/health`, {
       method: 'GET',
       signal: AbortSignal.timeout(HEALTH_CHECK_TIMEOUT),
     });
@@ -355,8 +542,8 @@ export async function checkNodeHealth(nodeUrl: string): Promise<HealthCheckResul
 
     const health = await healthResponse.json();
 
-    // Also verify RPC is responding
-    const rpcResponse = await fetch(httpUrl, {
+    // Also verify RPC is responding with size limit
+    const rpcResponse = await safeFetch(httpUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -383,8 +570,8 @@ export async function checkNodeHealth(nodeUrl: string): Promise<HealthCheckResul
       success: true,
       latency,
       data: {
-        isSyncing: health.isSyncing ?? rpcData.result?.isSyncing,
-        peers: rpcData.result?.peers,
+        isSyncing: (health as Record<string, unknown>).isSyncing ?? (rpcData as Record<string, unknown>).result,
+        peers: ((rpcData as Record<string, unknown>).result as Record<string, unknown>)?.peers,
       },
     };
   } catch (error) {
@@ -398,13 +585,14 @@ export async function checkNodeHealth(nodeUrl: string): Promise<HealthCheckResul
 
 /**
  * Check indexer health via HTTP GraphQL endpoint.
+ * Uses safeFetch to limit response sizes.
  */
 export async function checkIndexerHealth(indexerHttpUrl: string): Promise<HealthCheckResult> {
   const startTime = Date.now();
 
   try {
     // Simple GraphQL introspection query to verify indexer is responding
-    const response = await fetch(indexerHttpUrl, {
+    const response = await safeFetch(indexerHttpUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -423,7 +611,7 @@ export async function checkIndexerHealth(indexerHttpUrl: string): Promise<Health
       };
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as { errors?: Array<{ message?: string }>; data?: { __typename?: string } };
 
     // Check for GraphQL errors
     if (data.errors && data.errors.length > 0) {
@@ -450,13 +638,14 @@ export async function checkIndexerHealth(indexerHttpUrl: string): Promise<Health
 
 /**
  * Check prover health via /version endpoint.
+ * Uses safeFetch to limit response sizes.
  */
 export async function checkProverHealth(proverUrl: string): Promise<HealthCheckResult> {
   const startTime = Date.now();
 
   try {
-    // Prover exposes /version endpoint
-    const response = await fetch(`${proverUrl}/version`, {
+    // Prover exposes /version endpoint with size limit
+    const response = await safeFetch(`${proverUrl}/version`, {
       method: 'GET',
       signal: AbortSignal.timeout(HEALTH_CHECK_TIMEOUT),
     });
