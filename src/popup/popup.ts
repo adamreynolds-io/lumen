@@ -778,6 +778,9 @@ function toggleDebugPanel(): void {
 
 // Copy debug info to clipboard
 async function copyDebugInfo(): Promise<void> {
+  const btn = elements.btnCopyDebug;
+  const originalHTML = btn.innerHTML;
+
   try {
     const state = await sendMessage('getState') as { hasWallet: boolean; address?: string; balance?: string; network?: string };
 
@@ -806,7 +809,15 @@ async function copyDebugInfo(): Promise<void> {
     };
 
     await navigator.clipboard.writeText(JSON.stringify(debugInfo, null, 2));
-    showStatus('Debug info copied to clipboard', 'success');
+
+    // Show checkmark on button
+    btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+    btn.style.background = '#4caf50';
+
+    setTimeout(() => {
+      btn.innerHTML = originalHTML;
+      btn.style.background = '';
+    }, 1500);
   } catch (error) {
     showStatus(`Failed to copy: ${error}`, 'error');
   }
