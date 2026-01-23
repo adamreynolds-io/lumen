@@ -56,9 +56,6 @@ const elements = {
   debugBalancePending: document.getElementById('debug-balance-pending')!,
   debugCoinCount: document.getElementById('debug-coin-count')!,
   debugCoinList: document.getElementById('debug-coin-list')!,
-  debugNodeStatus: document.getElementById('debug-node-status')!,
-  debugIndexerStatus: document.getElementById('debug-indexer-status')!,
-  debugProverStatus: document.getElementById('debug-prover-status')!,
   debugTabs: document.querySelectorAll('.debug-tab'),
   tabContents: document.querySelectorAll('.tab-content'),
   // Shielded tab elements
@@ -576,15 +573,11 @@ async function updateDebugPanel(): Promise<void> {
       elements.debugCoinList.innerHTML = '<span class="empty">No coins</span>';
     }
 
-    // Update connection status (debug panel and status bar)
+    // Update status bar health indicators
     if (connectionStatus) {
-      updateHealthIndicator(elements.debugNodeStatus, connectionStatus.node);
-      updateHealthIndicator(elements.debugIndexerStatus, connectionStatus.indexer);
-      updateHealthIndicator(elements.debugProverStatus, connectionStatus.prover);
-      // Update status bar dots
-      updateStatusDot(elements.statusNode, connectionStatus.node);
-      updateStatusDot(elements.statusIndexer, connectionStatus.indexer);
-      updateStatusDot(elements.statusProver, connectionStatus.prover);
+      updateStatusDot(elements.statusNode, 'Node', connectionStatus.node);
+      updateStatusDot(elements.statusIndexer, 'Indexer', connectionStatus.indexer);
+      updateStatusDot(elements.statusProver, 'Prover', connectionStatus.prover);
     }
 
     // Update shielded tab
@@ -739,31 +732,27 @@ function renderCoinItem(coin: CoinInfo, index: number): string {
   `;
 }
 
-// Update a connection status indicator with health info
-function updateHealthIndicator(element: HTMLElement, health: ServiceHealth): void {
-  // Map ServiceStatus to display class
-  const statusMap: Record<ServiceStatus, string> = {
-    healthy: 'connected',
-    degraded: 'connecting',
-    unhealthy: 'disconnected',
-    unknown: 'unknown',
-  };
-
-  const displayClass = statusMap[health.status];
-  const displayText = health.status.charAt(0).toUpperCase() + health.status.slice(1);
-
-  // Add latency if available
-  const latencyText = health.latency !== null ? ` (${health.latency}ms)` : '';
-
-  element.textContent = displayText + latencyText;
-  element.className = `status-indicator ${displayClass}`;
-  element.title = health.error || (health.lastChecked ? `Last checked: ${new Date(health.lastChecked).toLocaleTimeString()}` : '');
-}
-
 // Update a status bar dot with health info
-function updateStatusDot(element: HTMLElement, health: ServiceHealth): void {
+function updateStatusDot(element: HTMLElement, serviceName: string, health: ServiceHealth): void {
   element.className = `status-dot ${health.status}`;
-  element.title = health.error || `${health.status}${health.latency !== null ? ` (${health.latency}ms)` : ''}`;
+
+  // Build informative tooltip
+  const lines: string[] = [];
+  lines.push(`${serviceName}: ${health.status.charAt(0).toUpperCase() + health.status.slice(1)}`);
+
+  if (health.latency !== null) {
+    lines.push(`Latency: ${health.latency}ms`);
+  }
+
+  if (health.error) {
+    lines.push(`Error: ${health.error}`);
+  }
+
+  if (health.lastChecked) {
+    lines.push(`Checked: ${new Date(health.lastChecked).toLocaleTimeString()}`);
+  }
+
+  element.title = lines.join('\n');
 }
 
 // Toggle debug panel visibility
