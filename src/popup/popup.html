@@ -97,6 +97,7 @@
         <button class="debug-tab active" data-tab="dust">Dust</button>
         <button class="debug-tab" data-tab="shielded">Shielded</button>
         <button class="debug-tab" data-tab="unshielded">Unshielded</button>
+        <button class="debug-tab" data-tab="transactions">Transactions</button>
       </div>
 
       <div class="debug-content">
@@ -199,11 +200,13 @@
           </div>
         </div>
 
-        <!-- Transaction History (visible in all tabs when available) -->
-        <div id="tx-history-section" class="debug-section hidden">
-          <div class="debug-label">Recent Transactions</div>
-          <div id="tx-history-list" class="tx-list">
-            <div class="placeholder-message"><span>No transactions</span></div>
+        <!-- Transactions Tab -->
+        <div id="tab-transactions" class="tab-content">
+          <div class="debug-section">
+            <div class="debug-label">Recent Transactions</div>
+            <div id="tx-history-list" class="tx-list">
+              <div class="placeholder-message"><span>No transactions</span></div>
+            </div>
           </div>
         </div>
 

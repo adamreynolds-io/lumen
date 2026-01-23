@@ -73,7 +73,6 @@ const elements = {
   unshieldedRegistered: document.getElementById('unshielded-registered')!,
   unshieldedSyncProgress: document.getElementById('unshielded-sync-progress')!,
   // Transaction history
-  txHistorySection: document.getElementById('tx-history-section')!,
   txHistoryList: document.getElementById('tx-history-list')!,
   // Status bar
   statusNode: document.getElementById('status-node')!,
@@ -642,9 +641,8 @@ async function updateDebugPanel(): Promise<void> {
       elements.unshieldedContent.classList.add('hidden');
     }
 
-    // Update transaction history
+    // Update transaction history tab
     if (debugState?.recentTransactions && debugState.recentTransactions.length > 0) {
-      elements.txHistorySection.classList.remove('hidden');
       elements.txHistoryList.innerHTML = debugState.recentTransactions
         .slice(0, 10)
         .map((tx) => `
@@ -662,7 +660,7 @@ async function updateDebugPanel(): Promise<void> {
         `)
         .join('');
     } else {
-      elements.txHistorySection.classList.add('hidden');
+      elements.txHistoryList.innerHTML = '<div class="placeholder-message"><span>No transactions</span></div>';
     }
   } catch (error) {
     console.error('[Lumen] Failed to update debug panel:', error);
