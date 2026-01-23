@@ -133,6 +133,31 @@
 - Phase 6 depends on Phase 2, 3, 4
 - Phase 7 depends on all previous phases
 
+## Phase 8: Security Hardening ✅
+
+- [x] Fix wildcard postMessage vulnerability (use specific origin)
+- [x] Add HTML escaping to prevent XSS from blockchain data
+- [x] Add origin validation for dApp requests with approved origins tracking
+- [x] Restrict sensitive methods to popup-only access
+- [x] Add secure key wiping with random overwrite
+- [x] Add rate limiting (100 req/min per origin) to service worker
+- [x] Remove sensitive console logging in production
+- [x] Fix message timeout memory leak
+- [x] Add exponential backoff to balance polling with circuit breaker
+- [x] Strengthen origin validation (block dangerous protocols)
+- [x] Fix clearWallet to always wipe keys via try-finally
+- [x] Add SHA-256 integrity check for stored network config
+- [x] Add private IP blocking for custom URLs
+- [x] Use generic error messages to prevent info leakage
+- [x] Add response size limits to health checks
+- [x] Add confirmation dialog before copying debug info
+- [x] Trigger key wipe on uncaught errors
+
+**Implementation Notes**:
+- Comprehensive security review identified 5 Critical, 3 High, 4 Medium, 5 Low severity issues
+- All issues addressed with defense-in-depth approach
+- Key security features: rate limiting, origin validation, secure key wiping, XSS prevention
+
 ## Notes
 
 - Keep Midnight SDK integration minimal initially; may need adjustments based on actual SDK APIs
