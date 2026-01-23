@@ -78,6 +78,10 @@ const elements = {
   // Transaction history
   txHistorySection: document.getElementById('tx-history-section')!,
   txHistoryList: document.getElementById('tx-history-list')!,
+  // Status bar
+  statusNode: document.getElementById('status-node')!,
+  statusIndexer: document.getElementById('status-indexer')!,
+  statusProver: document.getElementById('status-prover')!,
 };
 
 // State
@@ -572,11 +576,15 @@ async function updateDebugPanel(): Promise<void> {
       elements.debugCoinList.innerHTML = '<span class="empty">No coins</span>';
     }
 
-    // Update connection status
+    // Update connection status (debug panel and status bar)
     if (connectionStatus) {
       updateHealthIndicator(elements.debugNodeStatus, connectionStatus.node);
       updateHealthIndicator(elements.debugIndexerStatus, connectionStatus.indexer);
       updateHealthIndicator(elements.debugProverStatus, connectionStatus.prover);
+      // Update status bar dots
+      updateStatusDot(elements.statusNode, connectionStatus.node);
+      updateStatusDot(elements.statusIndexer, connectionStatus.indexer);
+      updateStatusDot(elements.statusProver, connectionStatus.prover);
     }
 
     // Update shielded tab
@@ -750,6 +758,12 @@ function updateHealthIndicator(element: HTMLElement, health: ServiceHealth): voi
   element.textContent = displayText + latencyText;
   element.className = `status-indicator ${displayClass}`;
   element.title = health.error || (health.lastChecked ? `Last checked: ${new Date(health.lastChecked).toLocaleTimeString()}` : '');
+}
+
+// Update a status bar dot with health info
+function updateStatusDot(element: HTMLElement, health: ServiceHealth): void {
+  element.className = `status-dot ${health.status}`;
+  element.title = health.error || `${health.status}${health.latency !== null ? ` (${health.latency}ms)` : ''}`;
 }
 
 // Toggle debug panel visibility

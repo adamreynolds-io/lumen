@@ -799,3 +799,53 @@ button.icon-btn:hover {
   color: #fff;
   margin-top: 4px;
 }
+
+/* Bottom Status Bar */
+.status-bar {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  padding: 8px 0;
+  background: #16162a;
+  border-top: 1px solid #333;
+  flex-shrink: 0;
+}
+
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #666;
+}
+
+.status-dot.healthy {
+  background: #4caf50;
+  box-shadow: 0 0 4px #4caf50;
+}
+
+.status-dot.degraded {
+  background: #ff9800;
+  box-shadow: 0 0 4px #ff9800;
+}
+
+.status-dot.unhealthy {
+  background: #f44336;
+  box-shadow: 0 0 4px #f44336;
+}
+
+.status-dot.unknown {
+  background: #666;
+}
+
+.status-label {
+  font-size: 11px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
