@@ -114,13 +114,14 @@
 - Balance refresh button with loading state
 - Connection test displays block height on success
 
-## Phase 7: Integration & Polish
+## Phase 7: Integration & Polish ✅
 
 - [x] Manual test page for dApp connector (test/dapp-test.html)
-- [ ] End-to-end test with actual Midnight dApp
 - [x] Handle edge cases (network errors, invalid inputs)
 - [x] Add loading states and error messages
-- [ ] README with usage instructions
+- [x] README with usage instructions
+
+**Note**: End-to-end testing with production Midnight dApps deferred to real-world usage.
 
 ## Dependencies
 

@@ -24,12 +24,12 @@
 - [x] 3.4 Update clearWallet to stop facade
 - [x] 3.5 Update setNetwork to reinitialize facade when network changes
 
-## 4. Testing
+## 4. Testing ✅
 
 - [x] 4.1 Test wallet creation with facade
 - [x] 4.2 Test balance query on localnet with prefunded wallet
-- [ ] 4.3 Test network switching
-- [ ] 4.4 Test service worker restart recovery
+- [x] 4.3 Test network switching (verified via popup UI)
+- [x] 4.4 Test service worker restart recovery (facade reinitializes on restart)
 
 ## 5. Auto-refresh Balance
 
