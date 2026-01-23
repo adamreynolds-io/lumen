@@ -16,7 +16,6 @@ const elements = {
   importSeed: document.getElementById('import-seed')!,
   importKey: document.getElementById('import-key')!,
   importHex: document.getElementById('import-hex')!,
-  status: document.getElementById('status')!,
   localnetWallets: document.getElementById('localnet-wallets')!,
 
   // Wallet info
@@ -78,6 +77,8 @@ const elements = {
   statusNode: document.getElementById('status-node')!,
   statusIndexer: document.getElementById('status-indexer')!,
   statusProver: document.getElementById('status-prover')!,
+  statusHealth: document.getElementById('status-health')!,
+  statusMessage: document.getElementById('status-message')!,
 };
 
 // State
@@ -105,36 +106,28 @@ function sendMessage(method: string, params?: unknown): Promise<unknown> {
   });
 }
 
-// Helper: Show status message
+// Track status timeout for cleanup
+let statusTimeout: ReturnType<typeof setTimeout> | null = null;
+
+// Helper: Show status message in bottom status bar
 function showStatus(message: string, type: 'success' | 'error' | 'info'): void {
-  // Clear previous content
-  elements.status.innerHTML = '';
-
-  // Add message text
-  const messageSpan = document.createElement('span');
-  messageSpan.textContent = message;
-  elements.status.appendChild(messageSpan);
-
-  // Add copy button for errors
-  if (type === 'error') {
-    const copyBtn = document.createElement('button');
-    copyBtn.textContent = 'Copy';
-    copyBtn.className = 'copy-error-btn';
-    copyBtn.onclick = async (e) => {
-      e.stopPropagation();
-      await navigator.clipboard.writeText(message);
-      copyBtn.textContent = 'Copied';
-      setTimeout(() => (copyBtn.textContent = 'Copy'), 1500);
-    };
-    elements.status.appendChild(copyBtn);
+  // Clear any existing timeout
+  if (statusTimeout) {
+    clearTimeout(statusTimeout);
   }
 
-  elements.status.className = `status ${type}`;
-  elements.status.classList.remove('hidden');
+  // Hide health indicators, show message
+  elements.statusHealth.classList.add('hidden');
+  elements.statusMessage.textContent = message;
+  elements.statusMessage.className = `status-message ${type}`;
 
-  // Auto-hide after delay (longer for errors)
-  const delay = type === 'error' ? 10000 : 3000;
-  setTimeout(() => elements.status.classList.add('hidden'), delay);
+  // Auto-restore health indicators after delay (longer for errors)
+  const delay = type === 'error' ? 5000 : 2000;
+  statusTimeout = setTimeout(() => {
+    elements.statusMessage.classList.add('hidden');
+    elements.statusHealth.classList.remove('hidden');
+    statusTimeout = null;
+  }, delay);
 }
 
 // Helper: Show section

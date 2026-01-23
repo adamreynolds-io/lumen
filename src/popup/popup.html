@@ -254,24 +254,25 @@
       </div>
     </div>
 
-    <!-- Status Messages -->
-    <div id="status" class="status hidden"></div>
     </div><!-- end scroll-content -->
 
     <!-- Bottom Status Bar -->
     <footer class="status-bar">
-      <div class="status-item">
-        <span class="status-dot" id="status-node"></span>
-        <span class="status-label">Node</span>
+      <div id="status-health" class="status-health">
+        <div class="status-item">
+          <span class="status-dot" id="status-node"></span>
+          <span class="status-label">Node</span>
+        </div>
+        <div class="status-item">
+          <span class="status-dot" id="status-indexer"></span>
+          <span class="status-label">Indexer</span>
+        </div>
+        <div class="status-item">
+          <span class="status-dot" id="status-prover"></span>
+          <span class="status-label">Prover</span>
+        </div>
       </div>
-      <div class="status-item">
-        <span class="status-dot" id="status-indexer"></span>
-        <span class="status-label">Indexer</span>
-      </div>
-      <div class="status-item">
-        <span class="status-dot" id="status-prover"></span>
-        <span class="status-label">Prover</span>
-      </div>
+      <div id="status-message" class="status-message hidden"></div>
     </footer>
   </div>
 

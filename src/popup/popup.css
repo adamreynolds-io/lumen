@@ -804,11 +804,44 @@ button.icon-btn:hover {
 .status-bar {
   display: flex;
   justify-content: center;
-  gap: 24px;
-  padding: 8px 0;
+  align-items: center;
+  padding: 8px 16px;
   background: #16162a;
   border-top: 1px solid #333;
   flex-shrink: 0;
+  min-height: 32px;
+}
+
+.status-health {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+}
+
+.status-health.hidden {
+  display: none;
+}
+
+.status-message {
+  font-size: 12px;
+  text-align: center;
+  width: 100%;
+}
+
+.status-message.hidden {
+  display: none;
+}
+
+.status-message.success {
+  color: #4caf50;
+}
+
+.status-message.error {
+  color: #f44336;
+}
+
+.status-message.info {
+  color: #64b5f6;
 }
 
 .status-item {
