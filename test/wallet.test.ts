@@ -117,9 +117,11 @@ test('deriveKeys returns all required keys', () => {
 
   assert(result.success, 'Should succeed');
   if (result.success) {
+    assert(result.data.zswapKey.length > 0, 'Should have zswapKey');
     assert(result.data.dustKey.length > 0, 'Should have dustKey');
     assert(result.data.nightExternalKey.length > 0, 'Should have nightExternalKey');
-    assert(result.data.nightInternalKey.length > 0, 'Should have nightInternalKey');
+    assert(result.data.zswapSecretKeys !== undefined, 'Should have zswapSecretKeys');
+    assert(result.data.dustSecretKey !== undefined, 'Should have dustSecretKey');
   }
 });
 

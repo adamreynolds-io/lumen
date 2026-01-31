@@ -13,11 +13,10 @@ import {
   mnemonicToWords,
   HDWallet,
   Roles,
-  type Role,
 } from '@midnight-ntwrk/wallet-sdk-hd';
 
 import { DustAddress } from '@midnight-ntwrk/wallet-sdk-address-format';
-import { DustSecretKey } from '@midnight-ntwrk/ledger-v7';
+import { DustSecretKey, ZswapSecretKeys } from '@midnight-ntwrk/ledger-v7';
 
 import { mnemonicToSeedSync } from '@scure/bip39';
 
@@ -28,14 +27,16 @@ import { mnemonicToSeedSync } from '@scure/bip39';
 export interface WalletKeys {
   /** 64-byte seed derived from mnemonic */
   seed: Uint8Array;
+  /** Derived Zswap key for shielded wallet (raw bytes) */
+  zswapKey: Uint8Array;
   /** Derived Dust key for gas payments (raw bytes) */
   dustKey: Uint8Array;
-  /** Derived Night External key */
+  /** Derived Night External key for unshielded wallet */
   nightExternalKey: Uint8Array;
-  /** Derived Night Internal key */
-  nightInternalKey: Uint8Array;
   /** Dust secret key from ledger (for SDK operations) */
   dustSecretKey: DustSecretKey;
+  /** Zswap secret keys for shielded wallet (pre-computed) */
+  zswapSecretKeys: ZswapSecretKeys;
 }
 
 export interface WalletInfo {
@@ -105,6 +106,10 @@ export function mnemonicToSeed(words: string[] | string, passphrase = ''): Uint8
 
 /**
  * Derive wallet keys from a seed.
+ * Uses the correct derivation path matching the reference implementation:
+ * - Roles.Zswap for shielded wallet
+ * - Roles.NightExternal for unshielded wallet
+ * - Roles.Dust for dust/gas payments
  */
 export function deriveKeys(
   seed: Uint8Array,
@@ -120,37 +125,46 @@ export function deriveKeys(
     };
   }
 
-  const accountKey = walletResult.hdWallet.selectAccount(account);
+  // Derive all three keys using selectRoles for efficiency
+  const derivationResult = walletResult.hdWallet
+    .selectAccount(account)
+    .selectRoles([Roles.Zswap, Roles.NightExternal, Roles.Dust])
+    .deriveKeysAt(index);
 
-  // Derive keys for each role
-  const deriveRole = (role: Role): Uint8Array | null => {
-    const result = accountKey.selectRole(role).deriveKeyAt(index);
-    return result.type === 'keyDerived' ? result.key : null;
-  };
+  // Clear HD wallet after derivation for security
+  walletResult.hdWallet.clear();
 
-  const dustKey = deriveRole(Roles.Dust);
-  const nightExternalKey = deriveRole(Roles.NightExternal);
-  const nightInternalKey = deriveRole(Roles.NightInternal);
+  if (derivationResult.type !== 'keysDerived') {
+    return {
+      success: false,
+      error: `Failed to derive keys: ${derivationResult.type}`,
+    };
+  }
 
-  if (!dustKey || !nightExternalKey || !nightInternalKey) {
+  const zswapKey = derivationResult.keys[Roles.Zswap];
+  const nightExternalKey = derivationResult.keys[Roles.NightExternal];
+  const dustKey = derivationResult.keys[Roles.Dust];
+
+  if (!zswapKey || !nightExternalKey || !dustKey) {
     return {
       success: false,
       error: 'Failed to derive one or more keys',
     };
   }
 
-  // Create DustSecretKey from the HD-derived dust key (not raw seed)
-  // The dustKey is 32 bytes derived via HDWallet -> selectRole(Dust) -> deriveKeyAt(0)
+  // Create secret keys from derived keys
+  const zswapSecretKeys = ZswapSecretKeys.fromSeed(zswapKey);
   const dustSecretKey = DustSecretKey.fromSeed(dustKey);
 
   return {
     success: true,
     data: {
       seed,
+      zswapKey,
       dustKey,
       nightExternalKey,
-      nightInternalKey,
       dustSecretKey,
+      zswapSecretKeys,
     },
   };
 }
@@ -387,14 +401,14 @@ export function importFromHexSeed(
 
 /**
  * Sign a message with the wallet's private key.
- * Note: This is a placeholder - actual signing requires the full SDK.
+ * @deprecated Use LumenFacade.signRecipe() for actual signing operations.
+ * This placeholder is kept for backward compatibility with dApp connector.
  */
 export function signMessage(
   message: string,
   privateKey: Uint8Array
 ): WalletResult<{ signature: string }> {
-  // TODO: Implement actual message signing using SDK
-  // For now, return a deterministic hash-based signature
+  // Placeholder - actual signing should use facade.signRecipe()
   const encoder = new TextEncoder();
   const messageBytes = encoder.encode(message);
 
@@ -415,15 +429,14 @@ export function signMessage(
 
 /**
  * Sign a transaction.
- * Note: This is a placeholder - actual signing requires the full SDK.
+ * @deprecated Use LumenFacade.transfer() for actual transaction signing.
+ * This placeholder is kept for backward compatibility with dApp connector.
  */
 export function signTransaction(
   tx: unknown,
   privateKey: Uint8Array
 ): WalletResult<{ signedTx: string }> {
-  // TODO: Implement actual transaction signing using SDK
-  // For now, return a placeholder
-
+  // Placeholder - actual signing should use facade.transfer()
   const txJson = JSON.stringify(tx);
   const encoder = new TextEncoder();
   const txBytes = encoder.encode(txJson);

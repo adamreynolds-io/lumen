@@ -4,8 +4,27 @@
  * Types used across all extension components.
  */
 
+import { NetworkId as SdkNetworkId } from '@midnight-ntwrk/wallet-sdk-abstractions';
+
 // Network configuration
 export type NetworkId = 'localnet' | 'devnet' | 'qanet' | 'preview' | 'preprod' | 'custom';
+
+// SDK NetworkId mapping
+export const NETWORK_ID_MAP: Record<Exclude<NetworkId, 'custom'>, SdkNetworkId.NetworkId> = {
+  localnet: SdkNetworkId.NetworkId.Undeployed,
+  devnet: SdkNetworkId.NetworkId.DevNet,
+  qanet: SdkNetworkId.NetworkId.QaNet,
+  preview: SdkNetworkId.NetworkId.Preview,
+  preprod: SdkNetworkId.NetworkId.PreProd,
+};
+
+/**
+ * Convert string network ID to SDK NetworkId enum.
+ */
+export function toSdkNetworkId(networkId: NetworkId): SdkNetworkId.NetworkId {
+  if (networkId === 'custom') return SdkNetworkId.NetworkId.Undeployed;
+  return NETWORK_ID_MAP[networkId];
+}
 
 export interface NetworkConfig {
   id: NetworkId;
@@ -24,7 +43,7 @@ export const NETWORKS: Record<Exclude<NetworkId, 'custom'>, NetworkConfig> = {
   localnet: {
     id: 'localnet',
     name: 'Localnet',
-    nodeUrl: 'http://localhost:9944',
+    nodeUrl: 'ws://localhost:9944',
     indexerUrl: 'http://localhost:8088/api/v3/graphql',
     indexerWsUrl: 'ws://localhost:8088/api/v3/graphql/ws',
     proverUrl: 'http://localhost:6300',
@@ -40,10 +59,10 @@ export const NETWORKS: Record<Exclude<NetworkId, 'custom'>, NetworkConfig> = {
   qanet: {
     id: 'qanet',
     name: 'QANET',
-    nodeUrl: 'wss://rpc.qanet.midnight.network',
-    indexerUrl: 'https://indexer.qanet.midnight.network/api/v3/graphql',
-    indexerWsUrl: 'wss://indexer.qanet.midnight.network/api/v3/graphql/ws',
-    proverUrl: 'https://prover.qanet.midnight.network',
+    nodeUrl: 'wss://rpc.qanet.dev.midnight.network',
+    indexerUrl: 'https://indexer.qanet.dev.midnight.network/api/v3/graphql',
+    indexerWsUrl: 'wss://indexer.qanet.dev.midnight.network/api/v3/graphql/ws',
+    proverUrl: 'https://prover.qanet.dev.midnight.network',
   },
   preview: {
     id: 'preview',

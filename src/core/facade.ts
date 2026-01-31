@@ -1,451 +1,462 @@
 /**
- * Wallet Facade
+ * Lumen Facade
  *
- * Provides a simplified interface to the wallet-sdk for wallet operations.
- * Integrates DustWallet, ShieldedWallet, and UnshieldedWallet via WalletFacade.
+ * Thin wrapper around wallet-sdk-facade that holds state and delegates
+ * to the lib functions. Follows the midnight-wallet-cli pattern.
  */
 
-import { DustWallet, DustWalletState } from '@midnight-ntwrk/wallet-sdk-dust-wallet';
-import { ShieldedWallet, ShieldedWalletState } from '@midnight-ntwrk/wallet-sdk-shielded';
-import { UnshieldedWallet, UnshieldedWalletState } from '@midnight-ntwrk/wallet-sdk-unshielded-wallet';
-import { WalletFacade, FacadeState } from '@midnight-ntwrk/wallet-sdk-facade';
-import { DustSecretKey, ZswapSecretKeys, LedgerParameters } from '@midnight-ntwrk/ledger-v7';
+import type { WalletFacade, FacadeState } from '@midnight-ntwrk/wallet-sdk-facade';
+import type { KeyStore, TransactionHistoryEntry } from '@midnight-ntwrk/wallet-sdk-unshielded-wallet';
+import type { DustWalletState } from '@midnight-ntwrk/wallet-sdk-dust-wallet';
+import type { ShieldedWalletState } from '@midnight-ntwrk/wallet-sdk-shielded';
+import type { UnshieldedWalletState } from '@midnight-ntwrk/wallet-sdk-unshielded-wallet';
+import type * as ledger from '@midnight-ntwrk/ledger-v7';
+import { ShieldedAddress, UnshieldedAddress, DustAddress } from '@midnight-ntwrk/wallet-sdk-address-format';
 import { firstValueFrom } from 'rxjs';
-import { take } from 'rxjs/operators';
+import { take, timeout } from 'rxjs/operators';
+
+import {
+  initializeWallet,
+  executeTransfer,
+  executeDustRegistration,
+  executeDustDeregistration,
+  type EnvironmentConfig,
+  type WalletSecretKeys,
+  type TransferParams as LibTransferParams,
+  type TransferResult as LibTransferResult,
+} from '../lib/index.js';
+
 import {
   type ServiceHealth,
   checkNodeHealth,
   checkIndexerHealth,
   checkProverHealth,
 } from './network.js';
+import { toSdkNetworkId, type NetworkId } from './types.js';
 
 // ============================================
 // Types
 // ============================================
 
 export interface FacadeConfig {
-  /** Network identifier (localnet, devnet, etc.) */
   networkId: string;
-  /** Indexer HTTP URL for GraphQL queries */
   indexerHttpUrl: string;
-  /** Indexer WebSocket URL for subscriptions */
   indexerWsUrl: string;
-  /** Node RPC URL for transaction submission */
   nodeUrl: string;
-  /** Prover URL for ZK proof generation */
   proverUrl: string;
 }
 
-/** Keys required for full wallet functionality */
-export interface WalletKeys {
-  /** HD-derived dust key (32 bytes) */
-  dustKey: Uint8Array;
-  /** HD-derived shielded key (32 bytes) for ZswapSecretKeys */
-  shieldedKey: Uint8Array;
-  /** Public key for unshielded wallet */
-  unshieldedPublicKey: Uint8Array;
+// Re-export for backward compatibility
+export type TransferParams = LibTransferParams;
+export type TransferResult = LibTransferResult;
+
+export interface DustRegistrationParams {
+  utxoIds: string[];
+  dustReceiverAddress?: string;
+}
+
+export interface DustRegistrationResult {
+  success: boolean;
+  txId?: string;
+  error?: string;
+}
+
+export interface DustDeregistrationParams {
+  utxoIds: string[];
+}
+
+export interface DustDeregistrationResult {
+  success: boolean;
+  txId?: string;
+  error?: string;
+}
+
+export interface NightUtxoInfo {
+  id: string;
+  value: string;
+  registeredForDustGeneration: boolean;
+  tokenType: string;
+}
+
+export interface WalletAddresses {
+  shielded: string | null;
+  unshielded: string | null;
+  dust: string | null;
 }
 
 export interface DustBalance {
-  /** Total balance including pending */
   total: bigint;
-  /** Available balance (confirmed) */
   available: bigint;
-  /** Pending balance (unconfirmed) */
   pending: bigint;
 }
 
 export interface SyncProgress {
-  /** Percentage complete (0-100) */
   percentage: number;
-  /** Applied index (blocks processed by wallet) */
   appliedIndex: number;
-  /** Highest index (latest block on chain) */
   highestIndex: number;
-  /** Highest relevant index (latest block with wallet activity) */
   highestRelevantIndex: number;
-  /** Whether sync is complete */
   isComplete: boolean;
 }
 
-/** Dust generation details for a coin */
-export interface DustGenerationInfo {
-  /** When dust generation started */
-  generationTime: string | null;
-  /** Maximum dust capacity */
-  maxCapacity: string;
-  /** When max capacity will be reached */
-  maxCapReachedAt: string;
-  /** Currently generated dust amount */
-  currentlyGenerated: string;
-  /** Generation rate */
-  rate: string;
-}
-
-export interface CoinInfo {
-  /** Coin value in smallest unit */
-  value: string;
-  /** Coin status */
-  status: 'spendable' | 'pending' | 'spent';
-  /** Creation time (ISO timestamp) */
-  createdAt: string | null;
-  /** Sequence number */
-  sequenceNumber: number | null;
-  /** Merkle tree index */
-  merkleTreeIndex: string | null;
-  /** Backing NIGHT nonce (hex) */
-  backingNightNonce: string | null;
-  /** Dust generation details (if available) */
-  generation: DustGenerationInfo | null;
-}
-
-/** Serializable balance for debug panel (uses strings instead of bigints) */
 export interface SerializableBalance {
   total: string;
   available: string;
   pending: string;
 }
 
-/** Shielded wallet debug state */
 export interface ShieldedDebugState {
-  /** Balances by token type */
   balances: Record<string, string>;
-  /** Total coin count */
   coinCount: number;
-  /** Shielded address */
   address: string | null;
-  /** Sync progress */
   syncProgress: SyncProgress | null;
 }
 
-/** Unshielded wallet debug state */
 export interface UnshieldedDebugState {
-  /** Balance */
   balance: string;
-  /** UTXO count */
   utxoCount: number;
-  /** Registration status */
   isRegistered: boolean;
-  /** Sync progress */
   syncProgress: SyncProgress | null;
 }
 
-/** Transaction info for history display */
 export interface TransactionInfo {
-  /** Transaction ID (hex) */
   id: string;
-  /** Transaction type */
   type: 'transfer' | 'swap' | 'registration' | 'unknown';
-  /** Timestamp (ISO) */
   timestamp: string | null;
-  /** Status */
   status: 'confirmed' | 'pending' | 'failed';
-  /** Amount (if applicable) */
   amount: string | null;
-  /** Token type (if applicable) */
   tokenType: string | null;
 }
 
+export interface DustGenerationInfo {
+  generationTime: string | null;
+  maxCapacity: string;
+  maxCapReachedAt: string;
+  currentlyGenerated: string;
+  rate: string;
+}
+
+export interface CoinInfo {
+  value: string;
+  status: 'spendable' | 'pending' | 'spent';
+  createdAt: string | null;
+  sequenceNumber: number | null;
+  merkleTreeIndex: string | null;
+  backingNightNonce: string | null;
+  generation: DustGenerationInfo | null;
+}
+
 export interface DebugState {
-  /** Whether facade is started */
   facadeStarted: boolean;
-  /** Dust wallet sync progress */
   syncProgress: SyncProgress | null;
-  /** Dust balance breakdown (serializable strings) */
   balance: SerializableBalance | null;
-  /** Dust coin count */
   coinCount: number;
-  /** Facade start timestamp */
   facadeStartTime: string | null;
-  /** Shielded wallet state (if available) */
   shielded: ShieldedDebugState | null;
-  /** Unshielded wallet state (if available) */
   unshielded: UnshieldedDebugState | null;
-  /** Recent transactions (if available) */
   recentTransactions: TransactionInfo[];
 }
 
 export interface ConnectionStatus {
-  /** Node RPC health */
   node: ServiceHealth;
-  /** Indexer health */
   indexer: ServiceHealth;
-  /** Prover health */
   prover: ServiceHealth;
 }
 
 // ============================================
-// Wallet Facade
+// Lumen Facade
 // ============================================
 
 /**
- * Full wallet facade integrating DustWallet, ShieldedWallet, and UnshieldedWallet.
+ * Thin wrapper around WalletFacade that follows midnight-wallet-cli pattern.
  */
 export class LumenFacade {
   private walletFacade: WalletFacade | null = null;
-  private dustWallet: ReturnType<ReturnType<typeof DustWallet>['startWithSeed']> | null = null;
-  private shieldedWallet: ReturnType<ReturnType<typeof ShieldedWallet>['startWithShieldedSeed']> | null = null;
-  private unshieldedWallet: ReturnType<ReturnType<typeof UnshieldedWallet>['startWithPublicKey']> | null = null;
+  private secretKeys: WalletSecretKeys | null = null;
+  private unshieldedKeystore: KeyStore | null = null;
   private config: FacadeConfig;
-  private keys: WalletKeys;
-  /** Timestamp when facade was started */
   private startTime: Date | null = null;
-  /** Whether full facade mode is enabled */
-  private fullFacadeEnabled = false;
 
-  constructor(config: FacadeConfig, keys: WalletKeys) {
+  constructor(config: FacadeConfig) {
     this.config = config;
-    this.keys = keys;
   }
 
   /**
-   * Initialize the wallet and start syncing with the network.
-   * @param enableFullFacade If true, also starts ShieldedWallet and UnshieldedWallet
+   * Initialize and start the wallet.
    */
-  async start(enableFullFacade = false): Promise<void> {
-    if (this.dustWallet) {
+  async start(seed: Uint8Array): Promise<void> {
+    if (this.walletFacade) {
       return; // Already started
     }
 
-    this.fullFacadeEnabled = enableFullFacade;
-
-    // Common configuration
-    const commonConfig = {
-      networkId: this.config.networkId,
-      indexerClientConnection: {
-        indexerHttpUrl: this.config.indexerHttpUrl,
-        indexerWsUrl: this.config.indexerWsUrl,
-      },
+    const envConfig: EnvironmentConfig = {
+      networkId: toSdkNetworkId(this.config.networkId as NetworkId),
+      indexerHttpUrl: this.config.indexerHttpUrl,
+      indexerWsUrl: this.config.indexerWsUrl,
+      nodeWsUrl: this.config.nodeUrl,
+      provingServerUrl: this.config.proverUrl,
     };
 
-    // DustWallet configuration
-    const dustConfig = {
-      ...commonConfig,
-      costParameters: {
-        feePerByte: 1n,
-        feeBase: 1000n,
-      },
-      relayURL: new URL(this.config.nodeUrl),
-      provingServerUrl: new URL(this.config.proverUrl),
-    };
+    const result = await initializeWallet(seed, envConfig);
 
-    // Create DustWallet
-    const DustWalletClass = DustWallet(dustConfig);
-    const dustParameters = LedgerParameters.initialParameters().dust;
-    this.dustWallet = DustWalletClass.startWithSeed(this.keys.dustKey, dustParameters);
-    const dustSecretKey = DustSecretKey.fromSeed(this.keys.dustKey);
-    await this.dustWallet.start(dustSecretKey);
-
-    console.log('[Facade] DustWallet started');
-
-    // Start full facade if enabled
-    if (enableFullFacade) {
-      try {
-        // ShieldedWallet configuration
-        const shieldedConfig = {
-          ...commonConfig,
-          provingServerUrl: new URL(this.config.proverUrl),
-          relayUrl: new URL(this.config.nodeUrl),
-        };
-
-        // Create ShieldedWallet
-        const ShieldedWalletClass = ShieldedWallet(shieldedConfig);
-        this.shieldedWallet = ShieldedWalletClass.startWithShieldedSeed(this.keys.shieldedKey);
-
-        // Create ZswapSecretKeys for starting shielded wallet
-        const zswapSecretKeys = ZswapSecretKeys.fromSeed(this.keys.shieldedKey);
-
-        // UnshieldedWallet configuration
-        const unshieldedConfig = {
-          ...commonConfig,
-          relayUrl: new URL(this.config.nodeUrl),
-        };
-
-        // Create UnshieldedWallet with public key
-        const UnshieldedWalletClass = UnshieldedWallet(unshieldedConfig);
-        // UnshieldedWallet needs a public key - derive from shielded keys
-        const publicKey = zswapSecretKeys.coinPublicKey;
-        this.unshieldedWallet = UnshieldedWalletClass.startWithPublicKey(publicKey);
-
-        // Create full WalletFacade
-        this.walletFacade = new WalletFacade(
-          this.shieldedWallet,
-          this.unshieldedWallet,
-          this.dustWallet
-        );
-
-        // Start the full facade
-        await this.walletFacade.start(zswapSecretKeys, dustSecretKey);
-
-        console.log('[Facade] Full WalletFacade started');
-      } catch (error) {
-        console.warn('[Facade] Failed to start full facade, continuing with DustWallet only:', error);
-        this.fullFacadeEnabled = false;
-      }
-    }
-
-    // Record start time
+    this.walletFacade = result.facade;
+    this.secretKeys = result.secretKeys;
+    this.unshieldedKeystore = result.unshieldedKeystore;
     this.startTime = new Date();
+
+    console.log('[LumenFacade] Wallet started');
   }
 
   /**
-   * Stop the wallet and disconnect from the network.
+   * Stop the wallet.
    */
   async stop(): Promise<void> {
     if (this.walletFacade) {
       await this.walletFacade.stop();
       this.walletFacade = null;
-      this.shieldedWallet = null;
-      this.unshieldedWallet = null;
-    }
-
-    if (this.dustWallet) {
-      await this.dustWallet.stop();
-      this.dustWallet = null;
-    }
-
-    this.startTime = null;
-    console.log('[Facade] Wallet stopped');
-  }
-
-  /**
-   * Get the current DUST balance.
-   */
-  async getBalance(): Promise<DustBalance> {
-    if (!this.dustWallet) {
-      throw new Error('Wallet not started. Call start() first.');
-    }
-
-    const state = await this.dustWallet.waitForSyncedState();
-    const total = state.walletBalance(new Date());
-    const pendingCoins = state.pendingCoins;
-    const pending = pendingCoins.reduce((sum, coin) => sum + coin.initialValue, 0n);
-    const available = total - pending;
-
-    return { total, available, pending };
-  }
-
-  /**
-   * Get the current dust wallet state without waiting for full sync.
-   */
-  async getCurrentState(): Promise<DustWalletState | null> {
-    if (!this.dustWallet) {
-      return null;
-    }
-
-    try {
-      const state = await firstValueFrom(this.dustWallet.state.pipe(take(1)));
-      return state;
-    } catch {
-      return null;
+      this.secretKeys = null;
+      this.unshieldedKeystore = null;
+      this.startTime = null;
+      console.log('[LumenFacade] Wallet stopped');
     }
   }
 
   /**
-   * Get the current shielded wallet state.
-   */
-  async getShieldedState(): Promise<ShieldedWalletState | null> {
-    if (!this.shieldedWallet) {
-      return null;
-    }
-
-    try {
-      const state = await firstValueFrom(this.shieldedWallet.state.pipe(take(1)));
-      return state;
-    } catch {
-      return null;
-    }
-  }
-
-  /**
-   * Get the current unshielded wallet state.
-   */
-  async getUnshieldedState(): Promise<UnshieldedWalletState | null> {
-    if (!this.unshieldedWallet) {
-      return null;
-    }
-
-    try {
-      const state = await firstValueFrom(this.unshieldedWallet.state.pipe(take(1)));
-      return state;
-    } catch {
-      return null;
-    }
-  }
-
-  /**
-   * Get balance from current state without waiting for sync.
-   */
-  async getBalanceNonBlocking(): Promise<DustBalance | null> {
-    const state = await this.getCurrentState();
-    if (!state) {
-      return null;
-    }
-
-    try {
-      const total = state.walletBalance(new Date());
-      const pendingCoins = state.pendingCoins;
-      const pending = pendingCoins.reduce((sum, coin) => sum + coin.initialValue, 0n);
-      const available = total - pending;
-      return { total, available, pending };
-    } catch {
-      return null;
-    }
-  }
-
-  /**
-   * Get the DUST address for this wallet.
-   */
-  getDustAddress(): string {
-    const dustSecretKey = DustSecretKey.fromSeed(this.keys.dustKey);
-    return `dust_${dustSecretKey.publicKey.toString(16).padStart(64, '0')}`;
-  }
-
-  /**
-   * Check if the wallet is currently syncing.
-   */
-  async isSyncing(): Promise<boolean> {
-    const state = await this.getCurrentState();
-    if (!state) {
-      return false;
-    }
-    const progress = state.progress;
-    if (typeof progress.isStrictlyComplete === 'function') {
-      return !progress.isStrictlyComplete();
-    }
-    const appliedIndex = Number(progress.appliedIndex ?? 0);
-    const highestIndex = Number(progress.highestIndex ?? 0);
-    return highestIndex > 0 && appliedIndex < highestIndex;
-  }
-
-  /**
-   * Check if the facade is started.
+   * Check if wallet is started.
    */
   isStarted(): boolean {
-    return this.dustWallet !== null;
+    return this.walletFacade !== null;
+  }
+
+  // ============================================
+  // Wallet Operations (delegate to lib functions)
+  // ============================================
+
+  /**
+   * Transfer tokens.
+   */
+  async transfer(params: TransferParams): Promise<TransferResult> {
+    if (!this.walletFacade || !this.secretKeys) {
+      return { success: false, error: 'Wallet not started' };
+    }
+
+    return executeTransfer(
+      this.walletFacade,
+      params,
+      this.secretKeys,
+      this.unshieldedKeystore ?? undefined
+    );
   }
 
   /**
-   * Check if full facade mode is enabled.
+   * Register NIGHT UTXOs for dust generation.
    */
-  isFullFacadeEnabled(): boolean {
-    return this.fullFacadeEnabled && this.walletFacade !== null;
+  async registerForDust(params: DustRegistrationParams): Promise<DustRegistrationResult> {
+    if (!this.walletFacade || !this.unshieldedKeystore) {
+      return { success: false, error: 'Wallet not started' };
+    }
+
+    const state = await this.getUnshieldedState();
+    if (!state?.availableCoins || state.availableCoins.length === 0) {
+      return { success: false, error: 'No UTXOs available' };
+    }
+
+    // Filter available coins by the requested UTXO IDs
+    const selectedUtxos = state.availableCoins.filter((coin) => {
+      const utxoId = coin.utxo?.hash?.toString() ?? '';
+      return params.utxoIds.includes(utxoId);
+    });
+
+    if (selectedUtxos.length === 0) {
+      return { success: false, error: 'Selected UTXOs not found' };
+    }
+
+    return executeDustRegistration(
+      this.walletFacade,
+      { nightUtxos: selectedUtxos, dustReceiverAddress: params.dustReceiverAddress },
+      this.unshieldedKeystore
+    );
   }
 
   /**
-   * Extract sync progress from a wallet state's progress object.
+   * Deregister NIGHT UTXOs from dust generation.
    */
-  private extractSyncProgress(progress: { appliedIndex?: bigint; highestIndex?: bigint; highestRelevantIndex?: bigint; isStrictlyComplete?: () => boolean }): SyncProgress {
+  async deregisterFromDust(params: DustDeregistrationParams): Promise<DustDeregistrationResult> {
+    if (!this.walletFacade || !this.unshieldedKeystore) {
+      return { success: false, error: 'Wallet not started' };
+    }
+
+    const state = await this.getUnshieldedState();
+    if (!state?.availableCoins || state.availableCoins.length === 0) {
+      return { success: false, error: 'No UTXOs available' };
+    }
+
+    // Filter available coins by the requested UTXO IDs
+    const selectedUtxos = state.availableCoins.filter((coin) => {
+      const utxoId = coin.utxo?.hash?.toString() ?? '';
+      return params.utxoIds.includes(utxoId);
+    });
+
+    if (selectedUtxos.length === 0) {
+      return { success: false, error: 'Selected UTXOs not found' };
+    }
+
+    return executeDustDeregistration(
+      this.walletFacade,
+      { nightUtxos: selectedUtxos },
+      this.unshieldedKeystore
+    );
+  }
+
+  // ============================================
+  // State Queries
+  // ============================================
+
+  private async getDustState(): Promise<DustWalletState | null> {
+    if (!this.walletFacade) return null;
+    try {
+      const facadeState = await firstValueFrom(this.walletFacade.state().pipe(take(1)));
+      return facadeState.dust;
+    } catch {
+      return null;
+    }
+  }
+
+  private async getShieldedState(): Promise<ShieldedWalletState | null> {
+    if (!this.walletFacade) return null;
+    try {
+      const facadeState = await firstValueFrom(this.walletFacade.state().pipe(take(1)));
+      return facadeState.shielded;
+    } catch {
+      return null;
+    }
+  }
+
+  private async getUnshieldedState(): Promise<UnshieldedWalletState | null> {
+    if (!this.walletFacade) return null;
+    try {
+      const facadeState = await firstValueFrom(this.walletFacade.state().pipe(take(1)));
+      return facadeState.unshielded;
+    } catch {
+      return null;
+    }
+  }
+
+  async getBalance(): Promise<DustBalance | null> {
+    const state = await this.getDustState();
+    if (!state) return null;
+
+    const total = state.walletBalance(new Date());
+    const pending = state.pendingCoins.reduce((sum, coin) => sum + coin.initialValue, 0n);
+    return { total, available: total - pending, pending };
+  }
+
+  async getBalanceNonBlocking(): Promise<DustBalance | null> {
+    return this.getBalance();
+  }
+
+  async getWalletAddresses(): Promise<WalletAddresses> {
+    const result: WalletAddresses = { shielded: null, unshielded: null, dust: null };
+
+    if (!this.walletFacade) return result;
+
+    try {
+      // Get combined state from facade.state() like wallet-cli does
+      // Add timeout to avoid hanging if state hasn't emitted yet
+      const state = await firstValueFrom(
+        this.walletFacade.state().pipe(
+          take(1),
+          timeout(5000)
+        )
+      );
+
+      // Use SDK codec methods to encode addresses
+      // Must use SDK network ID (e.g., "undeployed") not config string (e.g., "localnet")
+      const sdkNetworkId = toSdkNetworkId(this.config.networkId as NetworkId);
+
+      if (state.shielded?.address) {
+        result.shielded = ShieldedAddress.codec.encode(sdkNetworkId, state.shielded.address).asString();
+      }
+
+      if (state.unshielded?.address) {
+        result.unshielded = UnshieldedAddress.codec.encode(sdkNetworkId, state.unshielded.address).asString();
+      }
+
+      if (state.dust?.address) {
+        result.dust = DustAddress.codec.encode(sdkNetworkId, state.dust.address).asString();
+      }
+    } catch (e) {
+      // Timeout or error - addresses not available yet
+      console.warn('[LumenFacade] Could not get addresses from state:', e);
+    }
+
+    return result;
+  }
+
+  private formatAddress(address: unknown, prefix: string): string | null {
+    if (!address) return null;
+
+    // Handle various address formats from SDK
+    if (typeof address === 'string') return address;
+
+    const addr = address as Record<string, unknown>;
+
+    // Try coinPublicKey (shielded)
+    const cpk = addr.coinPublicKey ?? addr.publicKey ?? addr.bytes;
+    if (cpk instanceof Uint8Array) {
+      return `${prefix}${Array.from(cpk).map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 40)}`;
+    }
+    if (typeof cpk === 'bigint') {
+      return `${prefix}${cpk.toString(16).padStart(64, '0').slice(0, 40)}`;
+    }
+
+    return null;
+  }
+
+  async getUnregisteredNightUtxos(): Promise<NightUtxoInfo[]> {
+    const state = await this.getUnshieldedState();
+    if (!state?.availableCoins) return [];
+
+    // Available coins from unshielded wallet that can be registered for dust
+    return state.availableCoins.map((coin) => ({
+      id: coin.utxo?.hash?.toString() ?? '',
+      value: (coin.utxo?.value ?? 0n).toString(),
+      registeredForDustGeneration: false,
+      tokenType: 'NIGHT',
+    }));
+  }
+
+  async getRegisteredNightUtxos(): Promise<NightUtxoInfo[]> {
+    // Registered UTXOs are tracked in the dust wallet, not unshielded
+    const dustState = await this.getDustState();
+    if (!dustState?.availableCoins) return [];
+
+    // Return dust coins as "registered" since they're generating dust
+    return dustState.availableCoins.map((coin) => ({
+      id: coin.backingNight?.toString() ?? '',
+      value: coin.initialValue.toString(),
+      registeredForDustGeneration: true,
+      tokenType: 'NIGHT',
+    }));
+  }
+
+  // ============================================
+  // Debug State
+  // ============================================
+
+  private extractSyncProgress(progress: {
+    appliedIndex?: bigint;
+    highestIndex?: bigint;
+    highestRelevantIndex?: bigint;
+    isStrictlyComplete?: () => boolean;
+  }): SyncProgress {
     const appliedIndex = Number(progress.appliedIndex ?? 0);
     const highestIndex = Number(progress.highestIndex ?? 0);
     const highestRelevantIndex = Number(progress.highestRelevantIndex ?? 0);
 
-    let isComplete = false;
-    if (typeof progress.isStrictlyComplete === 'function') {
-      isComplete = progress.isStrictlyComplete();
-    } else {
-      isComplete = (highestIndex > 0 && appliedIndex >= highestIndex) || (highestIndex === 0 && appliedIndex > 0);
-    }
+    const isComplete =
+      typeof progress.isStrictlyComplete === 'function'
+        ? progress.isStrictlyComplete()
+        : highestIndex > 0 && appliedIndex >= highestIndex;
 
     const percentage = isComplete
       ? 100
@@ -453,22 +464,11 @@ export class LumenFacade {
         ? Math.round((appliedIndex / highestIndex) * 100)
         : 0;
 
-    return {
-      percentage: isComplete ? 100 : percentage,
-      appliedIndex,
-      highestIndex,
-      highestRelevantIndex,
-      isComplete,
-    };
+    return { percentage, appliedIndex, highestIndex, highestRelevantIndex, isComplete };
   }
 
-  /**
-   * Get debug state for the debug panel.
-   */
   async getDebugState(): Promise<DebugState> {
-    const facadeStarted = this.dustWallet !== null;
-
-    if (!facadeStarted) {
+    if (!this.walletFacade) {
       return {
         facadeStarted: false,
         syncProgress: null,
@@ -481,149 +481,109 @@ export class LumenFacade {
       };
     }
 
-    // Get dust wallet state
-    const dustState = await this.getCurrentState();
-    let syncProgress: SyncProgress | null = null;
-    if (dustState) {
-      syncProgress = this.extractSyncProgress(dustState.progress);
-    }
-
-    // Get balance
-    const rawBalance = await this.getBalanceNonBlocking();
-    const balance: SerializableBalance | null = rawBalance
-      ? {
-          total: rawBalance.total.toString(),
-          available: rawBalance.available.toString(),
-          pending: rawBalance.pending.toString(),
-        }
-      : null;
-
-    const coinCount = dustState?.availableCoins?.length ?? 0;
-
-    // Get shielded state if available
-    let shielded: ShieldedDebugState | null = null;
-    if (this.fullFacadeEnabled) {
-      const shieldedState = await this.getShieldedState();
-      if (shieldedState) {
-        const balances: Record<string, string> = {};
-        for (const [tokenType, amount] of Object.entries(shieldedState.balances ?? {})) {
-          balances[tokenType] = (amount as bigint).toString();
-        }
-
-        // Extract address string from SDK address object (has coinPublicKey property)
-        let addressStr: string | null = null;
-        if (shieldedState.address) {
-          const addr = shieldedState.address as { coinPublicKey?: unknown };
-          const cpk = addr.coinPublicKey;
-
-          if (cpk instanceof Uint8Array) {
-            addressStr = Array.from(cpk).map(b => b.toString(16).padStart(2, '0')).join('');
-          } else if (Array.isArray(cpk)) {
-            addressStr = cpk.map((b: number) => b.toString(16).padStart(2, '0')).join('');
-          } else if (typeof cpk === 'bigint') {
-            addressStr = cpk.toString(16).padStart(64, '0');
-          } else if (typeof cpk === 'string') {
-            addressStr = cpk;
-          } else if (cpk && typeof cpk === 'object') {
-            const cpkObj = cpk as Record<string, unknown>;
-            if (cpkObj.bytes instanceof Uint8Array) {
-              addressStr = Array.from(cpkObj.bytes).map(b => b.toString(16).padStart(2, '0')).join('');
-            } else if (typeof cpkObj.toHex === 'function') {
-              addressStr = (cpkObj.toHex as () => string)();
-            } else {
-              // Find first Uint8Array property
-              for (const val of Object.values(cpkObj)) {
-                if (val instanceof Uint8Array) {
-                  addressStr = Array.from(val).map(b => b.toString(16).padStart(2, '0')).join('');
-                  break;
-                }
-              }
-            }
-          }
-        }
-
-        shielded = {
-          balances,
-          coinCount: shieldedState.totalCoins?.length ?? 0,
-          address: addressStr,
-          syncProgress: shieldedState.state?.progress ? this.extractSyncProgress(shieldedState.state.progress) : null,
-        };
-      }
-    }
-
-    // Get unshielded state if available
-    let unshielded: UnshieldedDebugState | null = null;
-    if (this.fullFacadeEnabled) {
-      const unshieldedState = await this.getUnshieldedState();
-      if (unshieldedState) {
-        unshielded = {
-          balance: (unshieldedState.balance ?? 0n).toString(),
-          utxoCount: unshieldedState.utxos?.length ?? 0,
-          isRegistered: unshieldedState.isRegistered ?? false,
-          syncProgress: unshieldedState.state?.progress ? this.extractSyncProgress(unshieldedState.state.progress) : null,
-        };
-      }
-    }
-
-    // Extract transaction history from shielded wallet
-    const recentTransactions = await this.extractTransactionHistory();
+    const dustState = await this.getDustState();
+    const balance = await this.getBalance();
 
     return {
-      facadeStarted,
-      syncProgress,
-      balance,
-      coinCount,
+      facadeStarted: true,
+      syncProgress: dustState?.progress ? this.extractSyncProgress(dustState.progress) : null,
+      balance: balance
+        ? {
+            total: balance.total.toString(),
+            available: balance.available.toString(),
+            pending: balance.pending.toString(),
+          }
+        : null,
+      coinCount: dustState?.availableCoins?.length ?? 0,
       facadeStartTime: this.startTime?.toISOString() ?? null,
-      shielded,
-      unshielded,
-      recentTransactions,
+      shielded: await this.getShieldedDebugState(),
+      unshielded: await this.getUnshieldedDebugState(),
+      recentTransactions: await this.extractTransactionHistory(),
+    };
+  }
+
+  private async getShieldedDebugState(): Promise<ShieldedDebugState | null> {
+    const state = await this.getShieldedState();
+    if (!state) return null;
+
+    const balances: Record<string, string> = {};
+    for (const [tokenType, amount] of Object.entries(state.balances ?? {})) {
+      balances[tokenType] = (amount as bigint).toString();
+    }
+
+    // Use SDK codec to encode address (must use SDK network ID)
+    let address: string | null = null;
+    if (state.address) {
+      try {
+        const sdkNetworkId = toSdkNetworkId(this.config.networkId as NetworkId);
+        address = ShieldedAddress.codec.encode(sdkNetworkId, state.address).asString();
+      } catch {
+        address = this.formatAddress(state.address, 'zswap1');
+      }
+    }
+
+    return {
+      balances,
+      coinCount: state.totalCoins?.length ?? 0,
+      address,
+      syncProgress: state.state?.progress ? this.extractSyncProgress(state.state.progress) : null,
+    };
+  }
+
+  private async getUnshieldedDebugState(): Promise<UnshieldedDebugState | null> {
+    const state = await this.getUnshieldedState();
+    if (!state) return null;
+
+    // Get NIGHT balance from balances record (NIGHT token ID is all zeros)
+    const NIGHT_TOKEN_ID = '0000000000000000000000000000000000000000000000000000000000000000';
+    const nightBalance = state.balances?.[NIGHT_TOKEN_ID] ?? 0n;
+
+    return {
+      balance: nightBalance.toString(),
+      utxoCount: state.totalCoins?.length ?? 0,
+      isRegistered: (state.totalCoins?.length ?? 0) > 0,
+      syncProgress: state.progress ? this.extractSyncProgress(state.progress) : null,
     };
   }
 
   /**
-   * Extract transaction history from shielded and unshielded wallet states.
-   * Returns up to 10 most recent transactions, sorted by timestamp.
+   * Extract transaction history from SDK wallets (following wallet-cli pattern).
    */
   private async extractTransactionHistory(): Promise<TransactionInfo[]> {
-    if (!this.fullFacadeEnabled) {
-      return [];
-    }
+    if (!this.walletFacade) return [];
 
     const transactions: TransactionInfo[] = [];
 
-    // Extract from shielded wallet
     try {
+      // Get shielded transactions from ShieldedWalletState.transactionHistory
       const shieldedState = await this.getShieldedState();
-      if (shieldedState?.transactionHistory?.length > 0) {
-        const recentTxs = shieldedState.transactionHistory.slice(-10).reverse();
-
-        for (const tx of recentTxs) {
+      if (shieldedState?.transactionHistory) {
+        for (const tx of shieldedState.transactionHistory as ledger.FinalizedTransaction[]) {
           try {
-            const txHash = typeof tx.transactionHash === 'function'
-              ? tx.transactionHash()
-              : String(tx);
+            const hash = tx.transactionHash?.()?.toString() ?? '';
+            const identifiers = tx.identifiers?.() ?? [];
 
-            let txType: TransactionInfo['type'] = 'unknown';
-            let amount: string | null = null;
-            let tokenType: string | null = null;
-
-            if (tx.rewards) {
-              txType = 'registration';
-            } else if (tx.intents && tx.intents.size > 0) {
-              txType = 'swap';
-            } else {
-              txType = 'transfer';
+            // Classify transaction type from identifiers
+            let type: TransactionInfo['type'] = 'unknown';
+            const idStr = identifiers.join(',').toLowerCase();
+            if (idStr.includes('transfer')) {
+              type = 'transfer';
+            } else if (idStr.includes('swap')) {
+              type = 'swap';
+            } else if (idStr.includes('register') || idStr.includes('dust')) {
+              type = 'registration';
             }
 
+            // Extract amount from imbalances (segment 0)
+            let amount: string | null = null;
+            let tokenType: string | null = null;
             try {
-              const imbalances = typeof tx.imbalances === 'function' ? tx.imbalances(0) : null;
+              const imbalances = tx.imbalances?.(0);
               if (imbalances && imbalances.size > 0) {
-                for (const [token, value] of imbalances.entries()) {
-                  if (value !== 0n) {
-                    amount = (value < 0n ? -value : value).toString();
-                    tokenType = String(token);
-                    break;
-                  }
+                const firstEntry = imbalances.entries().next().value;
+                if (firstEntry) {
+                  tokenType = String(firstEntry[0]);
+                  amount = String(firstEntry[1]);
                 }
               }
             } catch {
@@ -631,65 +591,67 @@ export class LumenFacade {
             }
 
             transactions.push({
-              id: txHash,
-              type: txType,
-              timestamp: null,
+              id: hash,
+              type,
+              timestamp: null, // Shielded transactions don't have timestamps in SDK
               status: 'confirmed',
               amount,
               tokenType,
             });
-          } catch (err) {
-            console.warn('[Facade] Failed to process shielded transaction:', err);
+          } catch {
+            // Skip malformed transaction
           }
         }
       }
-    } catch (err) {
-      console.warn('[Facade] Failed to extract shielded transaction history:', err);
+    } catch (e) {
+      console.warn('[LumenFacade] Error extracting shielded transactions:', e);
     }
 
-    // Extract from unshielded wallet
     try {
+      // Get unshielded transactions from UnshieldedWalletState.transactionHistory.getAll()
       const unshieldedState = await this.getUnshieldedState();
       if (unshieldedState?.transactionHistory) {
-        const txHistory = unshieldedState.transactionHistory;
-        // getAll() returns AsyncIterableIterator
-        if (typeof txHistory.getAll === 'function') {
-          const entries: Array<{
-            hash: string;
-            timestamp: Date;
-            status: 'SUCCESS' | 'FAILURE' | 'PARTIAL_SUCCESS';
-            fees: bigint | null;
-          }> = [];
+        const entries: TransactionHistoryEntry[] = [];
+        for await (const entry of unshieldedState.transactionHistory.getAll()) {
+          entries.push(entry);
+          if (entries.length >= 50) break; // Limit iteration
+        }
 
-          // Collect entries from async iterator
-          for await (const entry of txHistory.getAll()) {
-            entries.push(entry);
-            if (entries.length >= 10) break; // Limit
+        for (const entry of entries) {
+          // Classify transaction type from identifiers
+          let type: TransactionInfo['type'] = 'unknown';
+          const idStr = (entry.identifiers ?? []).join(',').toLowerCase();
+          if (idStr.includes('transfer')) {
+            type = 'transfer';
+          } else if (idStr.includes('swap')) {
+            type = 'swap';
+          } else if (idStr.includes('register') || idStr.includes('dust')) {
+            type = 'registration';
           }
 
-          for (const entry of entries) {
-            const statusMap: Record<string, TransactionInfo['status']> = {
-              'SUCCESS': 'confirmed',
-              'FAILURE': 'failed',
-              'PARTIAL_SUCCESS': 'confirmed',
-            };
-
-            transactions.push({
-              id: entry.hash,
-              type: 'transfer', // Unshielded are typically transfers
-              timestamp: entry.timestamp?.toISOString() ?? null,
-              status: statusMap[entry.status] ?? 'confirmed',
-              amount: entry.fees?.toString() ?? null,
-              tokenType: 'tDUST',
-            });
+          // Map status
+          let status: TransactionInfo['status'] = 'confirmed';
+          if (entry.status === 'FAILURE') {
+            status = 'failed';
+          } else if (entry.status === 'PARTIAL_SUCCESS') {
+            status = 'pending';
           }
+
+          transactions.push({
+            id: entry.hash,
+            type,
+            timestamp: entry.timestamp?.toISOString() ?? null,
+            status,
+            amount: entry.fees?.toString() ?? null,
+            tokenType: 'NIGHT', // Unshielded is always NIGHT
+          });
         }
       }
-    } catch (err) {
-      console.warn('[Facade] Failed to extract unshielded transaction history:', err);
+    } catch (e) {
+      console.warn('[LumenFacade] Error extracting unshielded transactions:', e);
     }
 
-    // Sort by timestamp (if available), most recent first
+    // Sort by timestamp (newest first), nulls last
     transactions.sort((a, b) => {
       if (!a.timestamp && !b.timestamp) return 0;
       if (!a.timestamp) return 1;
@@ -697,33 +659,29 @@ export class LumenFacade {
       return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
     });
 
-    // Return up to 10
+    // Return last 10
     return transactions.slice(0, 10);
   }
 
-  /**
-   * Get list of coins for debug display with full details.
-   */
   async getCoins(): Promise<CoinInfo[]> {
-    const state = await this.getCurrentState();
-    if (!state) {
-      return [];
-    }
+    const state = await this.getDustState();
+    if (!state) return [];
 
     const coins: CoinInfo[] = [];
     const now = new Date();
 
     try {
-      const fullInfoCoins = state.availableCoinsWithFullInfo(now);
-      for (const fullInfo of fullInfoCoins) {
-        const token = fullInfo.token;
+      for (const fullInfo of state.availableCoinsWithFullInfo(now)) {
+        // Use generatedNow as the coin value (following wallet-cli pattern)
+        // This is the actual current dust value, not initialValue
+        const currentValue = fullInfo.generatedNow ?? fullInfo.token.initialValue ?? 0n;
         coins.push({
-          value: token.initialValue.toString(),
+          value: currentValue.toString(),
           status: 'spendable',
-          createdAt: token.ctime?.toISOString() ?? null,
-          sequenceNumber: token.seq ?? null,
-          merkleTreeIndex: token.mtIndex?.toString() ?? null,
-          backingNightNonce: token.backingNight?.toString() ?? null,
+          createdAt: fullInfo.token.ctime?.toISOString() ?? null,
+          sequenceNumber: fullInfo.token.seq ?? null,
+          merkleTreeIndex: fullInfo.token.mtIndex?.toString() ?? null,
+          backingNightNonce: fullInfo.token.backingNight?.toString() ?? null,
           generation: {
             generationTime: fullInfo.dtime?.toISOString() ?? null,
             maxCapacity: fullInfo.maxCap?.toString() ?? '0',
@@ -762,12 +720,8 @@ export class LumenFacade {
     return coins;
   }
 
-  /**
-   * Get connection status for debug display.
-   */
   async getConnectionStatus(): Promise<ConnectionStatus> {
     const now = new Date().toISOString();
-
     const unknownHealth: ServiceHealth = {
       status: 'unknown',
       latency: null,
@@ -775,12 +729,8 @@ export class LumenFacade {
       error: null,
     };
 
-    if (!this.dustWallet) {
-      return {
-        node: unknownHealth,
-        indexer: unknownHealth,
-        prover: unknownHealth,
-      };
+    if (!this.walletFacade) {
+      return { node: unknownHealth, indexer: unknownHealth, prover: unknownHealth };
     }
 
     const [nodeResult, indexerResult, proverResult] = await Promise.all([
@@ -789,17 +739,17 @@ export class LumenFacade {
       checkProverHealth(this.config.proverUrl),
     ]);
 
-    const toServiceHealth = (result: { success: boolean; latency: number; error?: string }): ServiceHealth => ({
-      status: result.success ? 'healthy' : 'unhealthy',
-      latency: result.latency,
+    const toHealth = (r: { success: boolean; latency: number; error?: string }): ServiceHealth => ({
+      status: r.success ? 'healthy' : 'unhealthy',
+      latency: r.latency,
       lastChecked: now,
-      error: result.error ?? null,
+      error: r.error ?? null,
     });
 
     return {
-      node: toServiceHealth(nodeResult),
-      indexer: toServiceHealth(indexerResult),
-      prover: toServiceHealth(proverResult),
+      node: toHealth(nodeResult),
+      indexer: toHealth(indexerResult),
+      prover: toHealth(proverResult),
     };
   }
 }
@@ -808,31 +758,10 @@ export class LumenFacade {
 // Factory Functions
 // ============================================
 
-/**
- * Create a new LumenFacade instance.
- * @param config Network configuration
- * @param keys Wallet keys (dustKey required, shieldedKey and unshieldedPublicKey for full facade)
- */
-export function createFacade(config: FacadeConfig, keys: WalletKeys): LumenFacade {
-  return new LumenFacade(config, keys);
+export function createFacade(config: FacadeConfig): LumenFacade {
+  return new LumenFacade(config);
 }
 
-/**
- * Create a new LumenFacade instance with just dust key (backward compatible).
- * @param config Network configuration
- * @param dustKey HD-derived dust key (32 bytes)
- */
-export function createDustOnlyFacade(config: FacadeConfig, dustKey: Uint8Array): LumenFacade {
-  return new LumenFacade(config, {
-    dustKey,
-    shieldedKey: dustKey, // Placeholder, won't be used if full facade not enabled
-    unshieldedPublicKey: new Uint8Array(32),
-  });
-}
-
-/**
- * Create facade configuration from network URLs.
- */
 export function createFacadeConfig(
   networkId: string,
   nodeUrl: string,
@@ -840,11 +769,5 @@ export function createFacadeConfig(
   indexerWsUrl: string,
   proverUrl: string
 ): FacadeConfig {
-  return {
-    networkId,
-    nodeUrl,
-    indexerHttpUrl: indexerUrl,
-    indexerWsUrl,
-    proverUrl,
-  };
+  return { networkId, nodeUrl, indexerHttpUrl: indexerUrl, indexerWsUrl, proverUrl };
 }

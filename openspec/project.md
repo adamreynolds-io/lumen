@@ -40,8 +40,10 @@
 
 - Scenario-based acceptance testing aligned with OpenSpec scenarios
 - Unit tests for wallet core logic (key management, signing, transactions)
-- Integration tests against devnet/testnet
+- Integration tests against localnet (current status)
 - Manual QA validation for dApp connector compatibility
+
+**Current Testing Status**: All integration testing has been performed against **localnet only**. Testing against devnet, testnet, and preprod networks is pending.
 
 ### Git Workflow
 
@@ -105,6 +107,11 @@ These packages only have pre-release versions (use with caution, API may change)
 These repos are for reference only (understanding specs, reviewing implementations):
 - https://github.com/midnightntwrk/midnight-dapp-connector-api
 - https://github.com/midnightntwrk/midnight-wallet
+
+### Troubleshooting Reference
+
+When encountering issues with wallet SDK integration, API behavior, or implementation problems, consult:
+- https://github.com/agronmurtezi/midnight-wallet-cli - Reference CLI wallet implementation for debugging and understanding expected behavior
 
 ### Other
 

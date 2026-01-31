@@ -1,6 +1,6 @@
 services:
   node:
-    image: ghcr.io/midnight-ntwrk/midnight-node:0.20.0-rc.1
+    image: ghcr.io/midnight-ntwrk/midnight-node:0.20.0
     ports:
       - "127.0.0.1:9944:9944"
     environment:
@@ -24,7 +24,7 @@ services:
       - no-new-privileges:true
 
   indexer:
-    image: ghcr.io/midnight-ntwrk/indexer-standalone:3.0.0-alpha.25
+    image: ghcr.io/midnight-ntwrk/indexer-standalone:3.0.0
     ports:
       - "127.0.0.1:8088:8088"
     environment:
@@ -50,7 +50,7 @@ services:
       - no-new-privileges:true
 
   proof-server:
-    image: ghcr.io/midnight-ntwrk/proof-server:7.0.0-rc.1
+    image: ghcr.io/midnight-ntwrk/proof-server:7.0.0
     ports:
       - "127.0.0.1:6300:6300"
     environment:

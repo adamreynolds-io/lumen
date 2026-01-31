@@ -49,7 +49,10 @@ import {
   type DebugState,
   type CoinInfo,
   type ConnectionStatus,
-  type WalletKeys as FacadeWalletKeys,
+  type NightUtxoInfo,
+  type WalletAddresses,
+  type DustRegistrationResult,
+  type DustDeregistrationResult,
 } from '../core/facade.js';
 
 // ============================================
@@ -89,9 +92,9 @@ function handleCriticalError(error: unknown): void {
           data.fill(0);
         }
       };
+      wipe(currentKeys.zswapKey);
       wipe(currentKeys.dustKey);
       wipe(currentKeys.nightExternalKey);
-      wipe(currentKeys.nightInternalKey);
     } catch {
       // Ignore errors during emergency wipe
     }
@@ -168,9 +171,9 @@ function secureWipe(data: Uint8Array): void {
 function securelyWipeKeys(): void {
   if (currentKeys) {
     // Wipe each key buffer
+    if (currentKeys.zswapKey) secureWipe(currentKeys.zswapKey);
     if (currentKeys.dustKey) secureWipe(currentKeys.dustKey);
     if (currentKeys.nightExternalKey) secureWipe(currentKeys.nightExternalKey);
-    if (currentKeys.nightInternalKey) secureWipe(currentKeys.nightInternalKey);
     currentKeys = null;
   }
   currentWalletInfo = null;
@@ -198,6 +201,12 @@ const POPUP_ONLY_METHODS = [
   'setNetwork',
   'getDebugState',
   'getCoins',
+  'transfer',
+  'getWalletAddresses',
+  'getUnregisteredNightUtxos',
+  'getRegisteredNightUtxos',
+  'registerForDust',
+  'deregisterFromDust',
 ];
 
 // ============================================
@@ -361,6 +370,8 @@ function stopBalancePolling(): void {
 /**
  * Initialize or reinitialize the wallet facade.
  * Called when wallet is loaded or network changes.
+ *
+ * Follows midnight-wallet-cli pattern: pass seed to start().
  */
 async function initializeFacade(): Promise<void> {
   // Stop existing facade and polling if any
@@ -374,7 +385,7 @@ async function initializeFacade(): Promise<void> {
     facade = null;
   }
 
-  // Need keys to initialize facade
+  // Need keys (with seed) to initialize facade
   if (!currentKeys) {
     return;
   }
@@ -391,21 +402,12 @@ async function initializeFacade(): Promise<void> {
     urls.proverUrl
   );
 
-  // Create full wallet keys for WalletFacade
-  const facadeKeys: FacadeWalletKeys = {
-    dustKey: currentKeys.dustKey,
-    // Use Night External key for shielded wallet (ZswapSecretKeys)
-    shieldedKey: currentKeys.nightExternalKey,
-    // Unshielded public key is derived from shielded keys inside facade
-    unshieldedPublicKey: new Uint8Array(32), // Placeholder, derived internally
-  };
-
-  // Create and start full facade
-  facade = createFacade(config, facadeKeys);
+  // Create facade (config only, following midnight-wallet-cli pattern)
+  facade = createFacade(config);
 
   try {
-    // Enable full WalletFacade mode (ShieldedWallet + UnshieldedWallet + DustWallet)
-    await facade.start(true);
+    // Start with seed - facade handles key derivation internally
+    await facade.start(currentKeys.seed);
     devLog(' Full WalletFacade initialized and syncing');
 
     // Start balance polling
@@ -799,6 +801,123 @@ const handlers: Record<string, (params?: unknown) => Promise<unknown> | unknown>
       indexerWsUrl: urls.indexerWsUrl,
       proverUrl: urls.proverUrl,
     };
+  },
+
+  // Transfer tokens to a recipient
+  transfer: async (params: {
+    tokenType: 'shielded' | 'unshielded';
+    tokenId: string;
+    receiverAddress: string;
+    amount: string;
+  }) => {
+    requireWallet();
+
+    if (!facade) {
+      throw new LumenError('Wallet facade not initialized', 'NO_WALLET');
+    }
+
+    if (!facade.isStarted()) {
+      throw new LumenError('Full facade not enabled for transfers', 'UNKNOWN_ERROR');
+    }
+
+    const result = await facade.transfer({
+      tokenType: params.tokenType,
+      tokenId: params.tokenId,
+      receiverAddress: params.receiverAddress,
+      amount: BigInt(params.amount),
+    });
+
+    if (!result.success) {
+      throw new LumenError(result.error || 'Transfer failed', 'UNKNOWN_ERROR');
+    }
+
+    devLog(' Transfer completed:', result.txId);
+
+    return { success: true, txId: result.txId };
+  },
+
+  // Get all wallet addresses (shielded, unshielded, dust)
+  getWalletAddresses: async (): Promise<WalletAddresses> => {
+    requireWallet();
+
+    if (!facade) {
+      throw new LumenError('Wallet facade not initialized', 'NO_WALLET');
+    }
+
+    return facade.getWalletAddresses();
+  },
+
+  // Get NIGHT UTXOs available for dust registration
+  getUnregisteredNightUtxos: async (): Promise<NightUtxoInfo[]> => {
+    requireWallet();
+
+    if (!facade) {
+      return [];
+    }
+
+    return facade.getUnregisteredNightUtxos();
+  },
+
+  // Get NIGHT UTXOs registered for dust generation
+  getRegisteredNightUtxos: async (): Promise<NightUtxoInfo[]> => {
+    requireWallet();
+
+    if (!facade) {
+      return [];
+    }
+
+    return facade.getRegisteredNightUtxos();
+  },
+
+  // Register NIGHT UTXOs for dust generation
+  registerForDust: async (params: {
+    utxoIds: string[];
+    dustReceiverAddress?: string;
+  }): Promise<DustRegistrationResult> => {
+    requireWallet();
+
+    if (!facade) {
+      throw new LumenError('Wallet facade not initialized', 'NO_WALLET');
+    }
+
+    if (!facade.isStarted()) {
+      throw new LumenError('Full facade not enabled for dust registration', 'UNKNOWN_ERROR');
+    }
+
+    const result = await facade.registerForDust(params);
+
+    if (!result.success) {
+      throw new LumenError(result.error || 'Dust registration failed', 'UNKNOWN_ERROR');
+    }
+
+    devLog(' Dust registration completed:', result.txId);
+
+    return result;
+  },
+
+  // Deregister NIGHT UTXOs from dust generation
+  deregisterFromDust: async (params: {
+    utxoIds: string[];
+  }): Promise<DustDeregistrationResult> => {
+    requireWallet();
+
+    if (!facade) {
+      throw new LumenError('Wallet facade not initialized', 'NO_WALLET');
+    }
+
+    if (!facade.isStarted()) {
+      throw new LumenError('Full facade not enabled for dust deregistration', 'UNKNOWN_ERROR');
+    }
+
+    const result = await facade.deregisterFromDust(params);
+
+    if (!result.success) {
+      throw new LumenError(result.error || 'Dust deregistration failed', 'UNKNOWN_ERROR');
+    }
+
+    devLog(' Dust deregistration completed:', result.txId);
+
+    return result;
   },
 
   // === Debug Methods ===

@@ -24,6 +24,12 @@
           <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
         </svg>
       </button>
+      <button id="btn-settings" class="header-btn hidden" title="Settings">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </button>
       <button id="btn-clear-wallet" class="header-btn-danger hidden" title="Clear Wallet">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <line x1="18" y1="6" x2="6" y2="18"/>
@@ -41,7 +47,7 @@
       <div class="wallet-info">
         <label>Network</label>
         <select id="network-select-initial">
-          <option value="localnet">Localnet</option>
+          <option value="localnet">Undeployed</option>
           <option value="devnet" selected>DevNet</option>
           <option value="qanet">QANET</option>
           <option value="preview">Preview</option>
@@ -49,7 +55,7 @@
         </select>
       </div>
 
-      <!-- Localnet prefunded wallets (shown when localnet selected) -->
+      <!-- Undeployed prefunded wallets (shown when Undeployed selected) -->
       <div id="localnet-wallets" class="localnet-section hidden">
         <label>Quick Import (Prefunded)</label>
         <div class="localnet-buttons">
@@ -70,18 +76,52 @@
 
     <!-- Wallet Loaded State -->
     <div id="wallet-loaded" class="section hidden">
-      <div class="wallet-info">
-        <label>Address</label>
-        <div class="address-row">
-          <code id="wallet-address">-</code>
-          <button id="btn-copy" class="icon-btn" title="Copy">📋</button>
+      <!-- All Wallet Addresses -->
+      <div class="wallet-addresses">
+        <div class="address-group">
+          <label>Dust Address</label>
+          <div class="address-row">
+            <code id="wallet-address" class="truncate">-</code>
+            <button id="btn-copy" class="icon-btn" title="Copy Dust Address">📋</button>
+          </div>
+        </div>
+        <div class="address-group">
+          <label>Shielded Address</label>
+          <div class="address-row">
+            <code id="wallet-shielded-address" class="truncate">-</code>
+            <button id="btn-copy-shielded" class="icon-btn" title="Copy Shielded Address">📋</button>
+          </div>
+        </div>
+        <div class="address-group">
+          <label>Unshielded Address</label>
+          <div class="address-row">
+            <code id="wallet-unshielded-address" class="truncate">-</code>
+            <button id="btn-copy-unshielded" class="icon-btn" title="Copy Unshielded Address">📋</button>
+          </div>
         </div>
       </div>
+
       <div class="wallet-info">
         <label>DUST Balance</label>
         <div class="balance-row">
           <span id="wallet-balance">-</span>
         </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="wallet-actions">
+        <button id="btn-transfer" class="action-btn primary">
+          <span class="btn-icon">↗</span>
+          Transfer
+        </button>
+        <button id="btn-register-dust" class="action-btn">
+          <span class="btn-icon">+</span>
+          Register Dust
+        </button>
+        <button id="btn-deregister-dust" class="action-btn">
+          <span class="btn-icon">−</span>
+          Deregister
+        </button>
       </div>
     </div>
 
@@ -149,10 +189,6 @@
               <span class="hint">Enable full WalletFacade mode</span>
             </div>
             <div id="shielded-content" class="hidden">
-              <div class="debug-value">
-                <span class="label">Address:</span>
-                <span id="shielded-address" class="truncate">-</span>
-              </div>
               <div class="debug-value">
                 <span class="label">Coins:</span>
                 <span id="shielded-coin-count">0</span>
@@ -247,10 +283,273 @@
     <div id="import-hex" class="section hidden">
       <label>Enter Hex Seed (64 or 128 chars)</label>
       <input type="password" id="hex-input" placeholder="0x... or raw hex">
-      <p class="hint">For localnet prefunded wallets or custom seeds</p>
+      <p class="hint">For Undeployed prefunded wallets or custom seeds</p>
       <div class="actions">
         <button id="btn-do-import-hex">Import</button>
         <button id="btn-cancel-import-hex" class="secondary">Cancel</button>
+      </div>
+    </div>
+
+    <!-- Transfer Modal -->
+    <div id="transfer-modal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Transfer Tokens</h2>
+          <button id="btn-close-transfer" class="close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <!-- Step indicators -->
+          <div class="step-indicator">
+            <span class="step active" data-step="1">Type</span>
+            <span class="step" data-step="2">Token</span>
+            <span class="step" data-step="3">Amount</span>
+            <span class="step" data-step="4">Address</span>
+            <span class="step" data-step="5">Confirm</span>
+          </div>
+
+          <!-- Step 1: Select Token Type -->
+          <div id="transfer-step-1" class="transfer-step">
+            <label>Select Transfer Type</label>
+            <div class="type-buttons">
+              <button class="type-btn" data-type="shielded">
+                <span class="type-icon">🔒</span>
+                <span class="type-name">Shielded</span>
+                <span class="type-desc">Private transfer</span>
+              </button>
+              <button class="type-btn" data-type="unshielded">
+                <span class="type-icon">🔓</span>
+                <span class="type-name">Unshielded</span>
+                <span class="type-desc">Public transfer</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Step 2: Select Token -->
+          <div id="transfer-step-2" class="transfer-step hidden">
+            <label>Select Token</label>
+            <div id="token-list" class="token-list">
+              <div class="placeholder-message">Loading tokens...</div>
+            </div>
+            <div class="step-actions">
+              <button id="transfer-back-1" class="secondary">Back</button>
+            </div>
+          </div>
+
+          <!-- Step 3: Enter Amount -->
+          <div id="transfer-step-3" class="transfer-step hidden">
+            <label>Enter Amount</label>
+            <div class="amount-input-group">
+              <input type="text" id="transfer-amount" placeholder="0.00">
+              <span id="transfer-token-symbol" class="token-symbol">-</span>
+            </div>
+            <div class="balance-hint">
+              Available: <span id="transfer-available">-</span>
+            </div>
+            <div class="step-actions">
+              <button id="transfer-back-2" class="secondary">Back</button>
+              <button id="transfer-next-3">Next</button>
+            </div>
+          </div>
+
+          <!-- Step 4: Enter Address -->
+          <div id="transfer-step-4" class="transfer-step hidden">
+            <label>Recipient Address</label>
+            <input type="text" id="transfer-address" placeholder="Enter recipient address">
+            <div class="step-actions">
+              <button id="transfer-back-3" class="secondary">Back</button>
+              <button id="transfer-next-4">Next</button>
+            </div>
+          </div>
+
+          <!-- Step 5: Confirm -->
+          <div id="transfer-step-5" class="transfer-step hidden">
+            <label>Confirm Transfer</label>
+            <div class="confirm-details">
+              <div class="confirm-row">
+                <span class="label">Type:</span>
+                <span id="confirm-type">-</span>
+              </div>
+              <div class="confirm-row">
+                <span class="label">Token:</span>
+                <span id="confirm-token">-</span>
+              </div>
+              <div class="confirm-row">
+                <span class="label">Amount:</span>
+                <span id="confirm-amount">-</span>
+              </div>
+              <div class="confirm-row">
+                <span class="label">To:</span>
+                <span id="confirm-address" class="truncate">-</span>
+              </div>
+            </div>
+            <div class="step-actions">
+              <button id="transfer-back-4" class="secondary">Back</button>
+              <button id="transfer-confirm" class="primary">Send</button>
+            </div>
+          </div>
+
+          <!-- Processing/Result -->
+          <div id="transfer-processing" class="transfer-step hidden">
+            <div class="processing-spinner"></div>
+            <p>Processing transfer...</p>
+          </div>
+          <div id="transfer-result" class="transfer-step hidden">
+            <div id="transfer-result-icon" class="result-icon">✓</div>
+            <p id="transfer-result-message">Transfer successful!</p>
+            <code id="transfer-tx-id" class="tx-id truncate"></code>
+            <button id="transfer-done" class="primary">Done</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dust Registration Modal -->
+    <div id="dust-register-modal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Register for Dust</h2>
+          <button id="btn-close-dust-register" class="close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div id="dust-register-select" class="dust-step">
+            <label>Select NIGHT UTXOs to Register</label>
+            <div id="unregistered-utxo-list" class="utxo-list">
+              <div class="placeholder-message">Loading UTXOs...</div>
+            </div>
+            <div class="dust-address-input">
+              <label>Dust Receiver Address (optional)</label>
+              <input type="text" id="dust-receiver-address" placeholder="Leave empty to use default">
+            </div>
+            <div class="step-actions">
+              <button id="dust-register-cancel" class="secondary">Cancel</button>
+              <button id="dust-register-next">Continue</button>
+            </div>
+          </div>
+          <div id="dust-register-confirm" class="dust-step hidden">
+            <label>Confirm Registration</label>
+            <div class="confirm-details">
+              <div class="confirm-row">
+                <span class="label">UTXOs:</span>
+                <span id="dust-confirm-utxo-count">-</span>
+              </div>
+              <div class="confirm-row">
+                <span class="label">Total Value:</span>
+                <span id="dust-confirm-total-value">-</span>
+              </div>
+              <div class="confirm-row">
+                <span class="label">Receiver:</span>
+                <span id="dust-confirm-receiver" class="truncate">-</span>
+              </div>
+            </div>
+            <div class="step-actions">
+              <button id="dust-register-back" class="secondary">Back</button>
+              <button id="dust-register-submit" class="primary">Register</button>
+            </div>
+          </div>
+          <div id="dust-register-processing" class="dust-step hidden">
+            <div class="processing-spinner"></div>
+            <p>Registering UTXOs for dust generation...</p>
+          </div>
+          <div id="dust-register-result" class="dust-step hidden">
+            <div id="dust-register-result-icon" class="result-icon">✓</div>
+            <p id="dust-register-result-message">Registration successful!</p>
+            <code id="dust-register-tx-id" class="tx-id truncate"></code>
+            <button id="dust-register-done" class="primary">Done</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dust Deregistration Modal -->
+    <div id="dust-deregister-modal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Deregister from Dust</h2>
+          <button id="btn-close-dust-deregister" class="close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div id="dust-deregister-select" class="dust-step">
+            <label>Select Registered UTXOs to Deregister</label>
+            <div id="registered-utxo-list" class="utxo-list">
+              <div class="placeholder-message">Loading UTXOs...</div>
+            </div>
+            <div class="step-actions">
+              <button id="dust-deregister-cancel" class="secondary">Cancel</button>
+              <button id="dust-deregister-next">Continue</button>
+            </div>
+          </div>
+          <div id="dust-deregister-confirm" class="dust-step hidden">
+            <label>Confirm Deregistration</label>
+            <div class="confirm-details">
+              <div class="confirm-row">
+                <span class="label">UTXOs:</span>
+                <span id="deregister-confirm-utxo-count">-</span>
+              </div>
+              <div class="confirm-row">
+                <span class="label">Total Value:</span>
+                <span id="deregister-confirm-total-value">-</span>
+              </div>
+            </div>
+            <p class="warning">These UTXOs will stop generating dust after deregistration.</p>
+            <div class="step-actions">
+              <button id="dust-deregister-back" class="secondary">Back</button>
+              <button id="dust-deregister-submit" class="primary">Deregister</button>
+            </div>
+          </div>
+          <div id="dust-deregister-processing" class="dust-step hidden">
+            <div class="processing-spinner"></div>
+            <p>Deregistering UTXOs...</p>
+          </div>
+          <div id="dust-deregister-result" class="dust-step hidden">
+            <div id="dust-deregister-result-icon" class="result-icon">✓</div>
+            <p id="dust-deregister-result-message">Deregistration successful!</p>
+            <code id="dust-deregister-tx-id" class="tx-id truncate"></code>
+            <button id="dust-deregister-done" class="primary">Done</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Settings</h2>
+          <button id="btn-close-settings" class="close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="settings-group">
+            <label>Network</label>
+            <select id="settings-network">
+              <option value="localnet">Undeployed</option>
+              <option value="devnet">DevNet</option>
+              <option value="qanet">QANET</option>
+              <option value="preview">Preview</option>
+              <option value="preprod">PreProd</option>
+            </select>
+          </div>
+          <div class="settings-group">
+            <label>Node URL</label>
+            <input type="text" id="settings-node-url" placeholder="wss://...">
+          </div>
+          <div class="settings-group">
+            <label>Indexer URL</label>
+            <input type="text" id="settings-indexer-url" placeholder="https://...">
+          </div>
+          <div class="settings-group">
+            <label>Indexer WS URL</label>
+            <input type="text" id="settings-indexer-ws-url" placeholder="wss://...">
+          </div>
+          <div class="settings-group">
+            <label>Prover URL</label>
+            <input type="text" id="settings-prover-url" placeholder="http://...">
+          </div>
+          <div class="settings-actions">
+            <button id="settings-reset" class="secondary">Reset to Defaults</button>
+            <button id="settings-apply" class="primary">Apply</button>
+          </div>
+          <p id="settings-status" class="settings-status hidden"></p>
+        </div>
       </div>
     </div>
 
